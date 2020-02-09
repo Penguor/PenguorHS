@@ -1,0 +1,95 @@
+
+-- head content
+data HEADSTART
+data HEADEND
+
+data FROM
+data INCLUDE
+data NF
+
+
+-- (,), {,}, [,]
+data LPAREN
+data RPAREN
+ -- round
+data LBRACE
+data RBRACE
+ -- curly
+data LBRACK
+data RBRACK
+
+
+-- operators
+data PLUS
+data MINUS
+data MUL
+data DIV
+
+data GREATER
+data LESS
+data GREATER_EQUALS
+data LESS_EQUALS
+data EQUALS
+data NEQUALS
+
+data AND
+data OR
+data NOT
+
+
+data ASSIGN
+
+
+-- null
+data NULL
+
+
+-- symbols
+data COLON
+data SEMICOLON
+
+data DOT
+data COMMA
+
+data EXCL_MARK
+
+
+data VAR
+
+
+-- literal
+data NUM
+data STRING
+data IDF
+
+data TRUE
+data FALSE
+
+
+-- keywords
+data FN
+
+data COMPONENT
+data SYSTEM
+data DATATYPE
+
+data IF
+data ELIF
+data ELSE
+
+data FOR
+data WHILE
+data DO
+
+data SWITCH
+data CASE
+data DEFAULT
+
+
+-- end of file
+data EOF
+
+
+-- TODO: implement error instead of other
+-- other
+data OTHER
