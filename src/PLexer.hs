@@ -16,8 +16,33 @@ data Token = Token { token :: String, tType :: TokenType.TokenType}
 
 tokenize :: String -> [Token]
 tokenize "" = [Token "" TokenType.EOF]
-tokenize (x : xs) | x == ' '  = tokenize xs
-                  | isAlpha x = buildIdf (x : xs)
+tokenize (x : xs) | x == ' '    = tokenize xs
+                  | isAlpha x   = buildIdf (x : xs)
+                  | isDigit x   = buildNum (x : xs)
+                  | x == '"'    = buildString xs
+                  | -- todo: line position counter
+                    isNewLine x = tokenize xs
+                  | x == '/'    = buildComment xs
+                  |
+             --     | x == '!' = 
+             --     | x == '#' =
+             --     | x == '|' =
+             --     | x == '&' =
+             --     | x == '=' =
+                    x == '+'    = Token "+" TokenType.PLUS : tokenize xs
+                  | x == '-'    = Token "-" TokenType.MINUS : tokenize xs
+                  | x == '*'    = Token "*" TokenType.MUL : tokenize xs
+                  | x == '('    = Token "(" TokenType.LPAREN : tokenize xs
+                  | x == ')'    = Token ")" TokenType.RPAREN : tokenize xs
+                  | x == '{'    = Token "[" TokenType.LBRACE : tokenize xs
+                  | x == '}'    = Token "[" TokenType.RBRACE : tokenize xs
+                  | x == '['    = Token "[" TokenType.LBRACK : tokenize xs
+                  | x == ']'    = Token "[" TokenType.RBRACK : tokenize xs
+                  | x == ':'    = Token "[" TokenType.COLON : tokenize xs
+                  | x == ';'    = Token "[" TokenType.SEMICOLON : tokenize xs
+                  | x == '<'    = Token "[" TokenType.LESS : tokenize xs
+                  | x == '>'    = Token "[" TokenType.GREATER : tokenize xs
+
 
 
 buildIdf :: String -> [Token]
@@ -39,3 +64,29 @@ buildIdf xs
     | otherwise          = Token idf TokenType.IDF : tokenize rest
     where (idf, rest) = span isAlphaNum xs
 
+
+buildNum :: String -> [Token]
+buildNum xs = Token num TokenType.NUM : tokenize rest
+    where (num, rest) = span isNumChr xs
+
+buildString :: String -> [Token]
+buildString xs = Token str TokenType.STRING : tokenize (drop 1 rest)
+    where (str, rest) = span (/= quote) xs
+
+buildComment :: String -> [Token]
+buildComment (x : xs) | x == '/' = tokenize (dropWhile isNewLine xs)
+                      -- todo: block comment missing
+
+
+quote :: Char
+quote = '"'
+
+isNewLine :: Char -> Bool
+isNewLine '\n' = True
+isNewLine '\r' = True
+isNewLine _    = False
+
+isNumChr :: Char -> Bool
+isNumChr x | x `elem` ['0' .. '9'] = True
+           | x == '.'              = True
+           | otherwise             = False

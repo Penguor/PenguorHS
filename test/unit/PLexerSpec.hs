@@ -69,3 +69,7 @@ spec = describe "PLexer.tokenize" $ do
                        , PLexer.Token "test" TokenType.IDF
                        , PLexer.Token "" TokenType.EOF
                        ]
+        PLexer.tokenize "\"test\""
+            `shouldBe` [ PLexer.Token "test" TokenType.STRING
+                       , PLexer.Token "" TokenType.EOF
+                       ]
