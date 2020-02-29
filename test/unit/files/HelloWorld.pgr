@@ -1,0 +1,12 @@
+!#
+ # library:test
+ # safety:2
+ #!
+
+system Welcome
+{
+    fn execute() string
+    {
+        print("Welcome");
+    }
+}

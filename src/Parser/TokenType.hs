@@ -1,6 +1,6 @@
 module Parser.TokenType where
 
-data TokenType = HEADSTART | HEADEND
+data TokenType = HASHTAG
     | FROM | INCLUDE | NF
     | LPAREN | RPAREN
     | LBRACE | RBRACE

@@ -16,32 +16,36 @@ data Token = Token { token :: String, tType :: TokenType.TokenType}
 
 tokenize :: String -> [Token]
 tokenize "" = [Token "" TokenType.EOF]
-tokenize (x : xs) | x == ' '    = tokenize xs
-                  | isAlpha x   = buildIdf (x : xs)
-                  | isDigit x   = buildNum (x : xs)
-                  | x == '"'    = buildString xs
-                  | -- todo: line position counter
-                    isNewLine x = tokenize xs
-                  | x == '/'    = buildComment xs
-                  |
-             --     | x == '!' = 
-             --     | x == '#' =
-             --     | x == '|' =
-             --     | x == '&' =
-             --     | x == '=' =
-                    x == '+'    = Token "+" TokenType.PLUS : tokenize xs
-                  | x == '-'    = Token "-" TokenType.MINUS : tokenize xs
-                  | x == '*'    = Token "*" TokenType.MUL : tokenize xs
-                  | x == '('    = Token "(" TokenType.LPAREN : tokenize xs
-                  | x == ')'    = Token ")" TokenType.RPAREN : tokenize xs
-                  | x == '{'    = Token "[" TokenType.LBRACE : tokenize xs
-                  | x == '}'    = Token "[" TokenType.RBRACE : tokenize xs
-                  | x == '['    = Token "[" TokenType.LBRACK : tokenize xs
-                  | x == ']'    = Token "[" TokenType.RBRACK : tokenize xs
-                  | x == ':'    = Token "[" TokenType.COLON : tokenize xs
-                  | x == ';'    = Token "[" TokenType.SEMICOLON : tokenize xs
-                  | x == '<'    = Token "[" TokenType.LESS : tokenize xs
-                  | x == '>'    = Token "[" TokenType.GREATER : tokenize xs
+tokenize (x : xs)
+    | x == ' ' = tokenize xs
+    | isAlpha x = buildIdf (x : xs)
+    | isDigit x = buildNum (x : xs)
+    | x == '"' = buildString xs
+    | -- todo: line position counter
+      isNewLine x = tokenize xs
+    | x == '/' = buildComment xs
+    | x == '#' = Token "#" TokenType.HASHTAG : buildIdf xs
+    | x == '&' = if head xs == '&'
+        then Token "&&" TokenType.AND : tokenize (tail xs)
+        else do
+            error "missing &"
+            [Token "" TokenType.OTHER]
+    | x == '=' = if head xs == '='
+        then Token "==" TokenType.EQUALS : tokenize (tail xs)
+        else Token "=" TokenType.ASSIGN : tokenize xs
+    | x == '+' = Token "+" TokenType.PLUS : tokenize xs
+    | x == '-' = Token "-" TokenType.MINUS : tokenize xs
+    | x == '*' = Token "*" TokenType.MUL : tokenize xs
+    | x == '(' = Token "(" TokenType.LPAREN : tokenize xs
+    | x == ')' = Token ")" TokenType.RPAREN : tokenize xs
+    | x == '{' = Token "[" TokenType.LBRACE : tokenize xs
+    | x == '}' = Token "[" TokenType.RBRACE : tokenize xs
+    | x == '[' = Token "[" TokenType.LBRACK : tokenize xs
+    | x == ']' = Token "[" TokenType.RBRACK : tokenize xs
+    | x == ':' = Token "[" TokenType.COLON : tokenize xs
+    | x == ';' = Token "[" TokenType.SEMICOLON : tokenize xs
+    | x == '<' = Token "[" TokenType.LESS : tokenize xs
+    | x == '>' = Token "[" TokenType.GREATER : tokenize xs
 
 
 
@@ -74,8 +78,12 @@ buildString xs = Token str TokenType.STRING : tokenize (drop 1 rest)
     where (str, rest) = span (/= quote) xs
 
 buildComment :: String -> [Token]
-buildComment (x : xs) | x == '/' = tokenize (dropWhile isNewLine xs)
-                      -- todo: block comment missing
+buildComment (x : xs)
+    | -- todo: debug line comment
+      x == '/' = tokenize (dropWhile isNewLine xs)
+    | x == '*' = if head xs == '/'
+        then tokenize (tail xs)
+        else buildComment (dropWhile (/= '*') xs)
 
 
 quote :: Char
