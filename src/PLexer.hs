@@ -30,6 +30,11 @@ tokenize (x : xs)
         else do
             error "missing &"
             [Token "" TokenType.OTHER]
+    | x == '|' = if head xs == '|'
+        then Token "&&" TokenType.OR : tokenize (tail xs)
+        else do
+            error "missing |"
+            [Token "" TokenType.OTHER]
     | x == '=' = if head xs == '='
         then Token "==" TokenType.EQUALS : tokenize (tail xs)
         else Token "=" TokenType.ASSIGN : tokenize xs
@@ -65,6 +70,8 @@ buildIdf xs
     | idf == "var"       = Token "var" TokenType.VAR : tokenize rest
     | idf == "true"      = Token "true" TokenType.TRUE : tokenize rest
     | idf == "false"     = Token "false" TokenType.FALSE : tokenize rest
+    | idf == "switch"    = Token "switch" TokenType.SWITCH : tokenize rest
+    | idf == "case"      = Token "case" TokenType.CASE : tokenize rest
     | otherwise          = Token idf TokenType.IDF : tokenize rest
     where (idf, rest) = span isAlphaNum xs
 

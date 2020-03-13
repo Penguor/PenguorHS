@@ -21,6 +21,7 @@ description: Please see the README on GitHub at <https://github.com/Penguor/Peng
 
 dependencies:
   - base >= 4.7 && < 5
+  - parsec
 
 library:
   source-dirs: src
@@ -34,6 +35,7 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
+      - parsec
       - PenguorHS
 
 tests:
@@ -48,6 +50,7 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
+      - parsec
 
   unit-tests:
     main: Spec.hs

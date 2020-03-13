@@ -1,20 +1,23 @@
-module Parser
-    ( parse
-    )
-where
-
-import           Parser.TokenType              as TokenType
-import           PLexer
+module Parser where
 
 
-programStmt tokens = headStmt tokens
+import           Text.Parsec
+import           Text.Parsec.String
+import           Text.Parsec.Char
 
-headStmt tokens = consume STRING
+program :: Parser String
+program = declaration
 
-parse :: [Token] -> Token
-parse (x : xs) = consume AND x
+declaration :: Parser String
+declaration = sysDec
 
-consume :: TokenType -> Token -> Token
-consume tokType x 
-    | tokType == tType x = x
-    | otherwise = error "not equal"
+sysDec :: Parser String
+sysDec = return "sysDec"
+
+string :: Parser String
+string = do
+    satisfy (== '"')
+    str <- many text
+    satisfy (== '"')
+    return str
+    where text = satisfy (/= '"')

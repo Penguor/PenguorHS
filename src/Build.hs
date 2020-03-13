@@ -8,6 +8,5 @@ import           Parser
 
 buildFromSource :: String -> IO ()
 buildFromSource file = do
-    let tokens  = tokenize file
-    let program = parse tokens
+    let tokens = tokenize file
     putStrLn (show tokens)
