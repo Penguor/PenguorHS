@@ -1,1 +1,8 @@
-fn
+# library
+
+system SHello
+{
+    component CLe < SHello {
+        
+    }
+}

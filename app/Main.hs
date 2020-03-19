@@ -14,5 +14,9 @@ main = do
         else case head args of
             "--build" -> do
                 file <- readFile (args !! 1)
-                buildFromSource file
+                putStrLn (buildFromSource file)
+            xs ->
+                putStrLn
+                    ("Invalid option \"" ++ xs ++ "\" \n use --help for help")
+
 

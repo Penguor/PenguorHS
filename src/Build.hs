@@ -3,10 +3,10 @@ module Build
     )
 where
 
-import           PLexer
+import           Text.Parsec
 import           Parser
 
-buildFromSource :: String -> IO ()
-buildFromSource file = do
-    let tokens = tokenize file
-    putStrLn (show tokens)
+buildFromSource :: String -> String
+buildFromSource input = do
+    either (show) (show) (parse program "" input)
+
