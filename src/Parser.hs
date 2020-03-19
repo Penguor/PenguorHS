@@ -6,8 +6,6 @@ import           Text.Parsec
 import           Text.Parsec.String
 import           Text.Parsec.Char
 
-data Null = Null
-    deriving(Show)
 
 data Declaration =
       System String String Block
@@ -17,7 +15,6 @@ data Declaration =
     | Function String String [(String, String)] Block
     | Library String Block
     | Stmt Statement
-    | EmptyDec
     deriving(Show)
 
 data Statement =
@@ -29,7 +26,7 @@ data Statement =
 data PPDirective =
       Include String
     | FromIncl String String
-    | Safety Int
+    | Safety Integer
     deriving(Show)
 
 data Block = Block [Declaration] | EmptyBlock
@@ -38,17 +35,24 @@ data Block = Block [Declaration] | EmptyBlock
 data Expression = Expression
     deriving(Show)
 
-program :: Parsec String () Declaration
-program = declaration
+program :: Parser [Declaration]
+program = many1 declaration
 
-declaration :: Parsec String () Declaration
+declaration :: Parser Declaration
 declaration =
-    sysDec <|> compDec <|> dtypeDec <|> varDec <|> functionDec <|> libDec
+    try sysDec
+        <|> try compDec
+        <|> try dtypeDec
+        <|> try varDec
+        <|> try functionDec
+        <|> try libDec
+        <|> try statement
+        <?> "error on parsing declaration"
 
 
-sysDec :: Parsec String () Declaration
+sysDec :: Parser Declaration
 sysDec = do
-    try (string "system")
+    string "system" <?> "expected 'system'"
     spaces
     name <- getIdentifier
     spaces
@@ -57,9 +61,9 @@ sysDec = do
     System name par <$> blockStmt
 
 
-compDec :: Parsec String () Declaration
+compDec :: Parser Declaration
 compDec = do
-    try (string "component")
+    string "component"
     spaces
     name <- getIdentifier
     spaces
@@ -67,9 +71,9 @@ compDec = do
     spaces
     Component name par <$> blockStmt
 
-dtypeDec :: Parsec String () Declaration
+dtypeDec :: Parser Declaration
 dtypeDec = do
-    try (string "datatype")
+    string "datatype"
     spaces
     name <- getIdentifier
     spaces
@@ -78,13 +82,13 @@ dtypeDec = do
     block <- blockStmt
     Datatype name par <$> blockStmt
 
-parent :: Parsec String () (String)
+parent :: Parser (String)
 parent = option "" (try $ char '<' >> spaces >> getIdentifier)
 
 
-varDec :: Parsec String () Declaration
+varDec :: Parser Declaration
 varDec = do
-    try (string "var")
+    string "var"
     spaces
     typ <- getIdentifier
     spaces
@@ -95,9 +99,9 @@ varDec = do
     char ';'
     return $ Var typ name expr
 
-functionDec :: Parsec String () Declaration
+functionDec :: Parser Declaration
 functionDec = do
-    try (string "fn")
+    string "fn"
     spaces
     typ <- getIdentifier
     spaces
@@ -107,55 +111,63 @@ functionDec = do
     spaces
     Function typ name params <$> blockStmt
 
-libDec :: Parsec String () Declaration
+libDec :: Parser Declaration
 libDec = do
-    try (string "library")
+    string "library"
     spaces
     name <- getIdentifier
     spaces
     Library name <$> blockStmt
 
 
-
-
-
-
-
 statement :: Parser Declaration
-statement = return $ Stmt IfStmt
+statement = (Stmt <$> preProcessorStmt)
 
---preProcessorStmt :: Parser Statement
---preProcessorStmt = do
---    try (char '#')
---    dir <- ppDirective
---    return dir
---
-----ppDirective :: Parser String
---ppDirective = (try $ string "dir")
+preProcessorStmt :: Parser Statement
+preProcessorStmt = try (char '#') >> PPStmt <$> ppDirective
+
+ppDirective :: Parser PPDirective
+ppDirective = include <|> fromIncl <|> safety
+
+include :: Parser PPDirective
+include = try (string "include ") >> Include <$> getIdentifier
+
+fromIncl :: Parser PPDirective
+fromIncl = do
+    try (string "from ")
+    lib <- getIdentifier
+    string "include "
+    FromIncl lib <$> getIdentifier
+
+safety :: Parser PPDirective
+safety = do
+    try (string "safety ")
+    level <- oneOf "012"
+    return $ Safety $ read [level]
+
 
 blockStmt :: Parser Block
 blockStmt = do
     spaces
-    char '{'
+    char '{' <?> "Expected '{'"
     spaces
-    dec <- option [EmptyDec] (many declaration)
+    dec <- manyTill declaration (char '}') <?> "error in BlockStmt"
     spaces
-    char '}'
     return $ Block dec
 
 
-expression :: Parsec String () Expression
+expression :: Parser Expression
 expression = return Expression
 
 
-parameters :: Parsec String () [(String, String)]
+parameters :: Parser [(String, String)]
 parameters = do
     par <- getParam
     try $ char ','
     rest <- option [] parameters
     return $ par : rest
 
-getParam :: Parsec String () (String, String)
+getParam :: Parser (String, String)
 getParam = do
     spaces
     typ <- getIdentifier

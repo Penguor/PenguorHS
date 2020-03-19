@@ -1,10 +1,10 @@
-library Hallo
+system SHello
 {
-    system SHello
+    system A
     {
-        component CLe < SHello 
-        {
-
-        }
+    }
+    system B
+    {
+        
     }
 }
