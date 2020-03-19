@@ -1,8 +1,10 @@
-# library
-
-system SHello
+library Hallo
 {
-    component CLe < SHello {
-        
+    system SHello
+    {
+        component CLe < SHello 
+        {
+
+        }
     }
 }

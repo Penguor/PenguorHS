@@ -9,17 +9,41 @@ import           Text.Parsec.Char
 data Null = Null
     deriving(Show)
 
-data Declaration = System String String Block | Component String String Block | Datatype String String Block | EmptyDec
+data Declaration =
+      System String String Block
+    | Component String String Block
+    | Datatype String String Block
+    | Var String String Expression
+    | Function String String [(String, String)] Block
+    | Library String Block
+    | Stmt Statement
+    | EmptyDec
+    deriving(Show)
+
+data Statement =
+      PPStmt PPDirective
+    | BlockStmt Block
+    | IfStmt
+    deriving(Show)
+
+data PPDirective =
+      Include String
+    | FromIncl String String
+    | Safety Int
     deriving(Show)
 
 data Block = Block [Declaration] | EmptyBlock
+    deriving(Show)
+
+data Expression = Expression
     deriving(Show)
 
 program :: Parsec String () Declaration
 program = declaration
 
 declaration :: Parsec String () Declaration
-declaration = sysDec <|> compDec <|> dtypeDec
+declaration =
+    sysDec <|> compDec <|> dtypeDec <|> varDec <|> functionDec <|> libDec
 
 
 sysDec :: Parsec String () Declaration
@@ -58,16 +82,38 @@ parent :: Parsec String () (String)
 parent = option "" (try $ char '<' >> spaces >> getIdentifier)
 
 
---libDec :: Parser String
---libDec = do
---    try (string "library")
---    spaces
---    name <- getIdentifier
---    spaces
---    parent <- try (char '<') *> spaces *> getIdentifier
---    spaces
---    block <- blockStmt
---    return (name parent block)
+varDec :: Parsec String () Declaration
+varDec = do
+    try (string "var")
+    spaces
+    typ <- getIdentifier
+    spaces
+    name <- getIdentifier
+    spaces
+    expr <- expression
+    spaces
+    char ';'
+    return $ Var typ name expr
+
+functionDec :: Parsec String () Declaration
+functionDec = do
+    try (string "fn")
+    spaces
+    typ <- getIdentifier
+    spaces
+    name <- getIdentifier
+    spaces
+    params <- between (char '(') (char ')') parameters
+    spaces
+    Function typ name params <$> blockStmt
+
+libDec :: Parsec String () Declaration
+libDec = do
+    try (string "library")
+    spaces
+    name <- getIdentifier
+    spaces
+    Library name <$> blockStmt
 
 
 
@@ -75,10 +121,10 @@ parent = option "" (try $ char '<' >> spaces >> getIdentifier)
 
 
 
-----statement :: Parser Statement
---statement = preProcessorStmt <|> blockStmt
---
------preProcessorStmt :: Parser Statement
+statement :: Parser Declaration
+statement = return $ Stmt IfStmt
+
+--preProcessorStmt :: Parser Statement
 --preProcessorStmt = do
 --    try (char '#')
 --    dir <- ppDirective
@@ -86,8 +132,6 @@ parent = option "" (try $ char '<' >> spaces >> getIdentifier)
 --
 ----ppDirective :: Parser String
 --ppDirective = (try $ string "dir")
-
-
 
 blockStmt :: Parser Block
 blockStmt = do
@@ -100,6 +144,25 @@ blockStmt = do
     return $ Block dec
 
 
+expression :: Parsec String () Expression
+expression = return Expression
+
+
+parameters :: Parsec String () [(String, String)]
+parameters = do
+    par <- getParam
+    try $ char ','
+    rest <- option [] parameters
+    return $ par : rest
+
+getParam :: Parsec String () (String, String)
+getParam = do
+    spaces
+    typ <- getIdentifier
+    spaces
+    name <- getIdentifier
+    spaces
+    return (typ, name)
 
 
 getIdentifier :: Parser String
