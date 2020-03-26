@@ -2,7 +2,6 @@ module Main where
 
 import           System.Environment
 import           Build
-import           PLexer
 import           System.IO
 
 main :: IO ()

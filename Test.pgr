@@ -2,9 +2,11 @@ system SHello
 {
     system A
     {
+
+        fn int Test(string Hallo) {
+        }
     }
     system B
     {
-        
     }
 }
