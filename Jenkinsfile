@@ -34,6 +34,6 @@ stack clean'''
 
   }
   environment {
-    HOME = '/tmp'
+    HOME = './tmp'
   }
 }
