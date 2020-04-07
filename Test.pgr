@@ -2,11 +2,12 @@ system SHello
 {
     system A
     {
-
         fn int Test(string Hallo) {
+            test.print("Test");
         }
     }
     system B
     {
+        var pi = Core.Math.PI;
     }
 }

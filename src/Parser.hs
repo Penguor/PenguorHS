@@ -53,6 +53,7 @@ data Expression =
     | NumExpr Double
     | StringExpr String
     | UnaryExpr TokenType.TokenType Expression
+    | BaseExpr String
     deriving(Show)
 
 program :: Parser [Declaration]
@@ -338,7 +339,22 @@ additionExpr = do
         _   -> return lhs
 
 multiplicationExpr :: Parser Expression
-multiplicationExpr = return NullExpr
+multiplicationExpr = do
+    lhs <- unaryExpr
+    op  <- option ' ' (try (oneOf "*/"))
+    case op of
+        '*' -> BinaryExpr lhs TokenType.MUL <$> unaryExpr
+        '/' -> BinaryExpr lhs TokenType.DIV <$> unaryExpr
+        _   -> return lhs
+
+unaryExpr :: Parser Expression
+unaryExpr = do
+    op <- option ' ' (try (oneOf "!-"))
+    case op of
+        '!' -> UnaryExpr TokenType.EXCL_MARK <$> unaryExpr
+        '-' -> UnaryExpr TokenType.MINUS <$> unaryExpr
+        _   -> try groupingExpr <|> try callExpr
+
 
 callExpr :: Parser Expression
 callExpr = do
@@ -349,6 +365,22 @@ callExpr = do
     case temp of
         Nothing -> return $ CallExpr (base : idfs) []
         Just x  -> CallExpr (base : idfs) <$> getArgs
+
+baseExpr :: Parser Expression
+baseExpr =
+    BaseExpr
+        <$> try (many1 digit)
+        <|> BaseExpr
+        <$> try (string "true")
+        <|> BaseExpr
+        <$> try (string "null")
+        <|> BaseExpr
+        <$> try getIdentifier
+        <?> "Expected base expression"
+
+groupingExpr :: Parser Expression
+groupingExpr = between (char '(') (char ')') expression
+
 
 getArgs :: Parser [Expression]
 getArgs = do
