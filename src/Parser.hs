@@ -10,7 +10,7 @@ import           Data.Data
 
 data Declaration =
       System String String Block
-    | Component String String Block
+    | Container String String Block
     | Datatype String String Block
     | Var String String Expression
     | Function String String [(String, String)] Block
@@ -61,7 +61,7 @@ program = many1 declaration
 declaration :: Parser Declaration
 declaration =
     try sysDec
-        <|> try compDec
+        <|> try contDec
         <|> try dtypeDec
         <|> try varDec
         <|> try functionDec
@@ -80,15 +80,15 @@ sysDec = do
     System name par <$> blockStmt
 
 
-compDec :: Parser Declaration
-compDec = do
+contDec :: Parser Declaration
+contDec = do
     string "component"
     spaces
     name <- getIdentifier
     spaces
     par <- parent
     spaces
-    Component name par <$> blockStmt
+    Container name par <$> blockStmt
 
 dtypeDec :: Parser Declaration
 dtypeDec = do
