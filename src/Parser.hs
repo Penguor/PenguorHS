@@ -150,25 +150,30 @@ statement =
         <|> try switchStmt
 
 preProcessorStmt :: Parser Statement
-preProcessorStmt = try (char '#') >> PPStmt <$> ppDirective
+preProcessorStmt = try (char '#') >> spaces >> PPStmt <$> ppDirective
 
 ppDirective :: Parser PPDirective
 ppDirective = include <|> fromIncl <|> safety
 
 include :: Parser PPDirective
-include = try (string "include ") >> Include <$> getIdentifier
+include = try (string "include ") >> spaces >> Include <$> getIdentifier
 
 fromIncl :: Parser PPDirective
 fromIncl = do
-    try (string "from ")
+    try (string "from")
+    spaces
     lib <- getIdentifier
-    string "include "
+    spaces
+    string "include"
+    spaces
     FromIncl lib <$> getIdentifier
 
 safety :: Parser PPDirective
 safety = do
-    try (string "safety ")
+    try (string "safety")
+    spaces
     level <- oneOf "012"
+    spaces
     return $ Safety $ read [level]
 
 
@@ -184,12 +189,19 @@ blockStmt = do
 ifStmt :: Parser Statement
 ifStmt = do
     string "if"
+    spaces
     condition <- between (char '(') (char ')') expression
+    spaces
     char '{'
+    spaces
     code <- many1 statement
+    spaces
     char '}'
+    spaces
     elifBlocks <- many elif
-    els        <- optionMaybe $ string "else"
+    spaces
+    els <- optionMaybe $ string "else"
+    spaces
     case els of
         Nothing -> return $ IfStmt condition code elifBlocks []
         Just x  -> IfStmt condition code elifBlocks <$> many1 statement
@@ -280,14 +292,16 @@ exprStmt = ExprStmt <$> (expression <* spaces <* char ';')
 
 
 expression :: Parser Expression
-expression = try assignExpr
+expression = try assignExpr <?> "Expected expression"
 
 assignExpr :: Parser Expression
 assignExpr = do
     expr <- try callExpr <|> try orExpr
+    spaces
     case expr of
-        CallExpr _ _ -> AssignExpr expr <$> assignExpr
-        _            -> return expr
+        CallExpr _ _ ->
+            AssignExpr expr <$> ((char '=') *> spaces *> assignExpr)
+        _ -> return expr
 
 orExpr :: Parser Expression
 orExpr = do
