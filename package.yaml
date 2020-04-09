@@ -50,6 +50,7 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
+      - hspec-parsec
       - parsec
 
   unit-tests:
@@ -63,3 +64,5 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
+      - hspec-parsec
+      - parsec

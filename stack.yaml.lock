@@ -11,6 +11,13 @@ packages:
       sha256: c3bb3df367c625daf464cb8b2393001890311d395213620b977a811ba22d3a26
   original:
     hackage: parsec-3.1.14.0
+- completed:
+    hackage: hspec-parsec-0@sha256:3469e0c2dbdbacc7adf27314a239c6d8a19790006a71dc82c0909b5b18efda0e,1242
+    pantry-tree:
+      size: 323
+      sha256: 975f128de1cdadf53213296abce350b68219030ea4b9c2618234f5bbb6791b75
+  original:
+    hackage: hspec-parsec-0
 snapshots:
 - completed:
     size: 524154

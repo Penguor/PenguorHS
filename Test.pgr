@@ -1,12 +1,1 @@
-system SHello
-{
-    system A
-    {
-        fn int Test(string Hallo) {
-        }
-    }
-    system B
-    {
-        var pi="test";
-    }
-}
+test;
