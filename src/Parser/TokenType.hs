@@ -22,4 +22,4 @@ data TokenType = HASHTAG
     | SWITCH | CASE | DEFAULT
     | EOF
     | OTHER
-    deriving(Eq, Show)
+    deriving(Show, Eq)

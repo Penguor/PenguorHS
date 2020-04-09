@@ -12,11 +12,11 @@ data Declaration =
       System String String Block
     | Container String String Block
     | Datatype String String Block
-    | Var String String Expression
+    | Var String String
     | Function String String [(String, String)] Block
     | Library String Block
     | Stmt Statement
-    deriving(Show)
+    deriving(Show, Eq)
 
 data Statement =
       PPStmt PPDirective
@@ -28,19 +28,19 @@ data Statement =
     | SwitchStmt String [Statement] [Statement]
     | CaseStmt Expression [Statement]
     | ExprStmt Expression
-    deriving(Show)
+    deriving(Show, Eq)
 
 data PPDirective =
       Include String
     | FromIncl String String
     | Safety Integer
-    deriving(Show)
+    deriving(Show, Eq)
 
 data Block = Block [Declaration] | EmptyBlock
-    deriving(Show)
+    deriving(Show, Eq)
 
 data Elif = Elif Expression [Statement]
-    deriving(Show)
+    deriving(Show, Eq)
 
 data Expression =
       AssignExpr Expression Expression
@@ -54,7 +54,7 @@ data Expression =
     | StringExpr String
     | UnaryExpr TokenType.TokenType Expression
     | BaseExpr String
-    deriving(Show)
+    deriving(Show, Eq)
 
 program :: Parser [Declaration]
 program = many1 declaration
@@ -72,7 +72,7 @@ declaration =
 
 sysDec :: Parser Declaration
 sysDec = do
-    string "system" <?> "expected 'system'"
+    string "system" <?> "expecting 'system'"
     spaces
     name <- getIdentifier
     spaces
@@ -83,7 +83,7 @@ sysDec = do
 
 contDec :: Parser Declaration
 contDec = do
-    string "component"
+    string "container" <?> "expecting 'container'"
     spaces
     name <- getIdentifier
     spaces
@@ -99,7 +99,6 @@ dtypeDec = do
     spaces
     par <- parent
     spaces
-    block <- blockStmt
     Datatype name par <$> blockStmt
 
 parent :: Parser (String)
@@ -108,25 +107,16 @@ parent = option "" (try $ char '<' >> spaces >> getIdentifier)
 
 varDec :: Parser Declaration
 varDec = do
-    string "var"
-    spaces
-    typ <- getIdentifier
-    spaces
-    name <- getIdentifier
-    spaces
-    expr <- expression
-    spaces
-    char ';'
-    return $ Var typ name expr
+    string "var" >> spaces
+    typ  <- getIdentifier <* spaces
+    name <- getIdentifier <* spaces <* char ';'
+    return $ Var typ name
 
 functionDec :: Parser Declaration
 functionDec = do
-    string "fn"
-    spaces
-    typ <- getIdentifier
-    spaces
-    name <- getIdentifier
-    spaces
+    string "fn" <* spaces
+    typ    <- getIdentifier <* spaces
+    name   <- getIdentifier <* spaces
     params <- between (char '(') (char ')') $ option [] $ try parameters
     spaces
     Function typ name params <$> blockStmt
@@ -148,15 +138,20 @@ statement =
         <|> try forStmt
         <|> try doStmt
         <|> try switchStmt
+        <|> try exprStmt
 
 preProcessorStmt :: Parser Statement
-preProcessorStmt = try (char '#') >> spaces >> PPStmt <$> ppDirective
+preProcessorStmt = char '#' >> spaces >> PPStmt <$> ppDirective
 
 ppDirective :: Parser PPDirective
-ppDirective = include <|> fromIncl <|> safety
+ppDirective =
+    try include
+        <|> try fromIncl
+        <|> try safety
+        <?> "expecting a preprocessor directive"
 
 include :: Parser PPDirective
-include = try (string "include ") >> spaces >> Include <$> getIdentifier
+include = string "include" >> oneSpaces >> Include <$> getIdentifier
 
 fromIncl :: Parser PPDirective
 fromIncl = do
@@ -224,8 +219,7 @@ elif = do
 
 whileStmt :: Parser Statement
 whileStmt = do
-    try $ string "while"
-    spaces
+    try $ string "while" <* oneSpaces
     condition <- between (char '(') (char ')') expression
     spaces
     char '{'
@@ -292,7 +286,7 @@ exprStmt = ExprStmt <$> (expression <* spaces <* char ';')
 
 
 expression :: Parser Expression
-expression = try assignExpr <?> "Expected expression"
+expression = try assignExpr <?> "expression"
 
 assignExpr :: Parser Expression
 assignExpr = do
@@ -433,3 +427,7 @@ getString = do
     satisfy (== '"')
     return str
     where text = satisfy (/= '"')
+
+-- parses one or more spaces 
+oneSpaces :: Parser ()
+oneSpaces = space >> spaces
