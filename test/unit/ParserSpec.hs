@@ -40,4 +40,18 @@ spec = do
             declaration "library Test {}"
                 `shouldParse` Parser.Library "Test" (Parser.Block [])
         it "can execute the statement parser" $ do
-            pending
+            declaration "#include Core" `shouldParse` Parser.Stmt
+                (Parser.PPStmt (Parser.Include "Core"))
+
+    describe "statement" $ do
+        let statement = parse Parser.statement ""
+        it "can execute the preprocessor statement parser" $ do
+            statement "#safety 2" `shouldParse` PPStmt (Parser.Safety 2)
+        it "can execute the if statement parser" $ do 
+            statement "if()"
+
+    describe "assignExpr" $ do
+        let assignExpr = parse Parser.assignExpr ""
+        it "can parse assignments" $ do
+            pendingWith "to be implemented"
+

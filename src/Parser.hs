@@ -46,7 +46,7 @@ data Expression =
       AssignExpr Expression Expression
     | BinaryExpr Expression TokenType.TokenType Expression
     | BooleanExpr Bool
-    | CallExpr [String] [Expression]
+    | CallExpr [Call]
     | GroupingExpr Expression
     | IdentifierExpr String
     | NullExpr
@@ -54,6 +54,9 @@ data Expression =
     | StringExpr String
     | UnaryExpr TokenType.TokenType Expression
     | BaseExpr String
+    deriving(Show, Eq)
+
+data Call = IdfCall String | FnCall String [Expression] | BaseCall Expression
     deriving(Show, Eq)
 
 program :: Parser [Declaration]
@@ -183,16 +186,11 @@ blockStmt = do
 
 ifStmt :: Parser Statement
 ifStmt = do
-    string "if"
-    spaces
+    string "if" <* spaces
     condition <- between (char '(') (char ')') expression
-    spaces
-    char '{'
-    spaces
+    spaces >> char '{' >> spaces
     code <- many1 statement
-    spaces
-    char '}'
-    spaces
+    spaces >> char '}' >> spaces
     elifBlocks <- many elif
     spaces
     els <- optionMaybe $ string "else"
@@ -282,97 +280,118 @@ caseStmt = do
     return $ CaseStmt expr code
 
 exprStmt :: Parser Statement
-exprStmt = ExprStmt <$> (expression <* spaces <* char ';')
+exprStmt = ExprStmt <$> (spaces >> expression <* spaces <* char ';' <* spaces)
 
 
 expression :: Parser Expression
-expression = try assignExpr <?> "expression"
+expression = try assignExpr
 
 assignExpr :: Parser Expression
 assignExpr = do
-    expr <- try callExpr <|> try orExpr
     spaces
-    case expr of
-        CallExpr _ _ ->
-            AssignExpr expr <$> ((char '=') *> spaces *> assignExpr)
-        _ -> return expr
+    expr <- orExpr <* spaces
+    op   <- option ' ' (char '=')
+    spaces
+    case op of
+        '=' -> AssignExpr expr <$> orExpr
+        _   -> return expr
 
 orExpr :: Parser Expression
 orExpr = do
-    lhs <- andExpr
-    op  <- option "" (string "||")
+    lhs <- andExpr <* spaces
+    op  <- option "" (try (string "||"))
+    spaces
     case op of
-        "||" -> BinaryExpr lhs TokenType.OR <$> andExpr
+        "||" -> BinaryExpr lhs TokenType.OR <$> orExpr
         _    -> return lhs
 
 andExpr :: Parser Expression
 andExpr = do
-    lhs <- equalityExpr
+    lhs <- equalityExpr <* spaces
     op  <- option "" (string "&&")
+    spaces
     case op of
-        "&&" -> BinaryExpr lhs TokenType.AND <$> equalityExpr
+        "&&" -> BinaryExpr lhs TokenType.AND <$> andExpr
         _    -> return lhs
 
 equalityExpr :: Parser Expression
 equalityExpr = do
-    lhs <- relationExpr
+    lhs <- relationExpr <* spaces
     op  <- option "" (try (string "==") <|> try (string "!="))
+    spaces
     case op of
-        "==" -> BinaryExpr lhs TokenType.EQUALS <$> relationExpr
-        "!=" -> BinaryExpr lhs TokenType.NEQUALS <$> relationExpr
+        "==" -> BinaryExpr lhs TokenType.EQUALS <$> equalityExpr
+        "!=" -> BinaryExpr lhs TokenType.NEQUALS <$> equalityExpr
         _    -> return lhs
 
 relationExpr :: Parser Expression
 relationExpr = do
-    lhs <- additionExpr
+    lhs <- additionExpr <* spaces
     op  <- option
         ""
         (try (string "<=") <|> try (string ">=") <|> try (string "<") <|> try
             (string ">")
         )
+    spaces
     case op of
-        "<=" -> BinaryExpr lhs TokenType.LESS_EQUALS <$> additionExpr
-        ">=" -> BinaryExpr lhs TokenType.GREATER_EQUALS <$> additionExpr
-        "<"  -> BinaryExpr lhs TokenType.LESS <$> additionExpr
-        ">"  -> BinaryExpr lhs TokenType.GREATER <$> additionExpr
+        "<=" -> BinaryExpr lhs TokenType.LESS_EQUALS <$> relationExpr
+        ">=" -> BinaryExpr lhs TokenType.GREATER_EQUALS <$> relationExpr
+        "<"  -> BinaryExpr lhs TokenType.LESS <$> relationExpr
+        ">"  -> BinaryExpr lhs TokenType.GREATER <$> relationExpr
         _    -> return lhs
 
 additionExpr :: Parser Expression
 additionExpr = do
-    lhs <- multiplicationExpr
+    lhs <- multiplicationExpr <* spaces
     op  <- option ' ' (try (oneOf "+-"))
+    spaces
     case op of
-        '+' -> BinaryExpr lhs TokenType.PLUS <$> multiplicationExpr
-        '-' -> BinaryExpr lhs TokenType.MINUS <$> multiplicationExpr
+        '+' -> BinaryExpr lhs TokenType.PLUS <$> additionExpr
+        '-' -> BinaryExpr lhs TokenType.MINUS <$> additionExpr
         _   -> return lhs
 
 multiplicationExpr :: Parser Expression
 multiplicationExpr = do
-    lhs <- unaryExpr
+    lhs <- unaryExpr <* spaces
     op  <- option ' ' (try (oneOf "*/"))
+    spaces
     case op of
-        '*' -> BinaryExpr lhs TokenType.MUL <$> unaryExpr
-        '/' -> BinaryExpr lhs TokenType.DIV <$> unaryExpr
+        '*' -> BinaryExpr lhs TokenType.MUL <$> multiplicationExpr
+        '/' -> BinaryExpr lhs TokenType.DIV <$> multiplicationExpr
         _   -> return lhs
 
 unaryExpr :: Parser Expression
 unaryExpr = do
+    spaces
     op <- option ' ' (try (oneOf "!-"))
+    spaces
     case op of
         '!' -> UnaryExpr TokenType.EXCL_MARK <$> unaryExpr
         '-' -> UnaryExpr TokenType.MINUS <$> unaryExpr
-        _   -> try groupingExpr <|> try callExpr
-
+        _   -> try groupingExpr <|> callExpr
 
 callExpr :: Parser Expression
-callExpr = do
-    base <- getIdentifier
-    idfs <- many $ char '.' >> getIdentifier
+callExpr = CallExpr <$> getCall
 
-    temp <- optionMaybe $ char '('
-    case temp of
-        Nothing -> return $ CallExpr (base : idfs) []
-        Just x  -> CallExpr (base : idfs) <$> getArgs
+getCall :: Parser [Call]
+getCall = do
+    base <- optionMaybe (try getIdentifier)
+    spaces
+    case base of
+        Nothing -> do
+            b <- baseExpr
+            return [BaseCall b]
+        Just idf -> do
+            next <- try anyChar <* spaces
+            case next of
+                '.' -> do
+                    rest <- getCall <* spaces
+                    return (IdfCall idf : rest)
+                '(' -> do
+                    args <- getArgs <* spaces <* char ')' <* spaces
+                    rest <- getCall <* spaces
+                    return (FnCall idf args : rest)
+                _ -> return []
 
 baseExpr :: Parser Expression
 baseExpr =
@@ -380,6 +399,8 @@ baseExpr =
         <$> try (many1 digit)
         <|> BaseExpr
         <$> try (string "true")
+        <|> BaseExpr
+        <$> try (string "false")
         <|> BaseExpr
         <$> try (string "null")
         <|> BaseExpr
@@ -429,5 +450,9 @@ getString = do
     where text = satisfy (/= '"')
 
 -- parses one or more spaces 
+
+
+
+
 oneSpaces :: Parser ()
 oneSpaces = space >> spaces
