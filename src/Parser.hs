@@ -187,7 +187,7 @@ blockStmt = do
 ifStmt :: Parser Statement
 ifStmt = do
     string "if" <* spaces
-    condition <- between (char '(') (char ')') expression
+    condition <- between (char '(' >> spaces) (spaces >>char ')') expression
     spaces >> char '{' >> spaces
     code <- many1 statement
     spaces >> char '}' >> spaces
@@ -375,13 +375,14 @@ callExpr = CallExpr <$> getCall
 
 getCall :: Parser [Call]
 getCall = do
-    base <- optionMaybe (try getIdentifier)
+    base <- optionMaybe (lookAhead (try getIdentifier))
     spaces
     case base of
         Nothing -> do
             b <- baseExpr
             return [BaseCall b]
-        Just idf -> do
+        Just x -> do
+            idf  <- getIdentifier
             next <- try anyChar <* spaces
             case next of
                 '.' -> do
@@ -391,7 +392,7 @@ getCall = do
                     args <- getArgs <* spaces <* char ')' <* spaces
                     rest <- getCall <* spaces
                     return (FnCall idf args : rest)
-                _ -> return []
+                _ -> return [IdfCall idf]
 
 baseExpr :: Parser Expression
 baseExpr =
