@@ -63,7 +63,7 @@ data Expression =
     deriving(Show, Eq)
 
 program :: Parser [Declaration]
-program = some declaration
+program = some declaration <* eof
 
 declaration :: Parser Declaration
 declaration =
