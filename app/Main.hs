@@ -3,6 +3,8 @@ module Main where
 import           System.Environment
 import           Build
 import           System.IO
+import qualified Data.Text                     as T
+                                                ( pack )
 
 main :: IO ()
 main = do
@@ -13,7 +15,7 @@ main = do
         else case head args of
             "--build" -> do
                 file <- readFile (args !! 1)
-                putStrLn (buildFromSource file)
+                buildFromSource (T.pack file)
             xs ->
                 putStrLn
                     ("Invalid option \"" ++ xs ++ "\" \n use --help for help")
