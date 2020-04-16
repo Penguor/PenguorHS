@@ -405,6 +405,8 @@ baseExpr =
         <$> try (string "null")
         <|> BaseExpr
         <$> try getIdentifier
+        <|> BaseExpr
+        <$> getString
         <?> "Expected base expression"
 
 groupingExpr :: Parser Expression
@@ -443,10 +445,7 @@ getIdentifier = many1 letter <> many alphaNum
 
 getString :: Parser String
 getString = do
-    satisfy (== '"')
-    str <- many text
-    satisfy (== '"')
-    return str
+    between (char '"') (char '"') (many text)
     where text = satisfy (/= '"')
 
 -- parses one or more spaces 
