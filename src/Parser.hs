@@ -186,7 +186,7 @@ blockStmt = do
 ifStmt :: Parser Statement
 ifStmt = do
     string "if" <* spaces
-    condition <- between (char '(' >> spaces) (spaces >>char ')') expression
+    condition <- between (char '(' >> spaces) (spaces >> char ')') expression
     spaces >> char '{' >> spaces
     code <- many1 statement
     spaces >> char '}' >> spaces
@@ -382,7 +382,7 @@ getCall = do
             return [BaseCall b]
         Just x -> do
             idf  <- getIdentifier
-            next <- try anyChar <* spaces
+            next <- lookAhead (try anyChar) <* spaces
             case next of
                 '.' -> do
                     rest <- getCall <* spaces
@@ -450,9 +450,6 @@ getString = do
     where text = satisfy (/= '"')
 
 -- parses one or more spaces 
-
-
-
 
 oneSpaces :: Parser ()
 oneSpaces = space >> spaces
