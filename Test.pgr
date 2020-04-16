@@ -1,4 +1,12 @@
 if(test)
 {
-    test = a;
+    system A
+    {
+        fn int Test(string Hallo) {
+        }
+    }
+    system B
+    {
+        test
+    }
 }

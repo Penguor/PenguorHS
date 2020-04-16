@@ -21,7 +21,8 @@ description: Please see the README on GitHub at <https://github.com/Penguor/Peng
 
 dependencies:
   - base >= 4.7 && < 5
-  - parsec
+  - megaparsec
+  - text
 
 library:
   source-dirs: src
@@ -35,7 +36,8 @@ executables:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-      - parsec
+      - megaparsec
+      - text
       - PenguorHS
 
 tests:
@@ -50,8 +52,8 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
-      - hspec-parsec
-      - parsec
+      - megaparsec
+
 
   unit-tests:
     main: Spec.hs
@@ -64,5 +66,4 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
-      - hspec-parsec
-      - parsec
+      - megaparsec
