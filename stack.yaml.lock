@@ -5,12 +5,12 @@
 
 packages:
 - completed:
-    hackage: parsec-3.1.14.0@sha256:9f35f3a6ae66c6e1c22a1b84e62731f1501057791ffb2554f710aa08c7a4d651,4211
+    hackage: megaparsec-8.0.0@sha256:362f85e243ecbcb550e1de6e5c74ba5a50c09edaa1208c99bc5b9fd242227fc6,3808
     pantry-tree:
-      size: 2574
-      sha256: c3bb3df367c625daf464cb8b2393001890311d395213620b977a811ba22d3a26
+      size: 1446
+      sha256: 955117c00a86970f2d0c215f33cf5293b16589c04678a0a790c03368ab6fd0aa
   original:
-    hackage: parsec-3.1.14.0
+    hackage: megaparsec-8.0.0
 snapshots:
 - completed:
     size: 524154

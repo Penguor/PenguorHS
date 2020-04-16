@@ -3,10 +3,9 @@ module Build
     )
 where
 
-import           Text.Parsec
+import           Text.Megaparsec
 import           Parser
 
 buildFromSource :: String -> String
-buildFromSource input = do
-    either (show) (show) (parse program "" input)
+buildFromSource input = runParser program "" input
 
