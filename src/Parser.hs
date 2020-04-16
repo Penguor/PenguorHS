@@ -23,8 +23,8 @@ data Declaration =
     | Container Text Text Block
     | Datatype Text Text Block
     | Var Text Text
-    | Function String String [(String, String)] Block
-    | Library String Block
+    | Function Text Text [(Text, Text)] Block
+    | Library Text Block
     | Stmt Statement
     deriving(Show, Eq)
 
@@ -33,16 +33,16 @@ data Statement =
     | BlockStmt Block
     | IfStmt Expression [Statement] [Elif] [Statement]
     | WhileStmt Expression [Statement]
-    | ForStmt (String, String) Expression [Statement]
+    | ForStmt (Text, Text) Expression [Statement]
     | DoStmt [Statement] Expression
-    | SwitchStmt String [Statement] [Statement]
+    | SwitchStmt Text [Statement] [Statement]
     | CaseStmt Expression [Statement]
     | ExprStmt Expression
     deriving(Show, Eq)
 
 data PPDirective =
-      Include String
-    | FromIncl String String
+      Include Text
+    | FromIncl Text Text
     | Safety Integer
     deriving(Show, Eq)
 
@@ -56,14 +56,14 @@ data Expression =
       AssignExpr Expression Expression
     | BinaryExpr Expression TokenType.TokenType Expression
     | BooleanExpr Bool
-    | CallExpr [String] [Expression]
+    | CallExpr [Text] [Expression]
     | GroupingExpr Expression
-    | IdentifierExpr String
+    | IdentifierExpr Text
     | NullExpr
     | NumExpr Double
-    | StringExpr String
+    | StringExpr Text
     | UnaryExpr TokenType.TokenType Expression
-    | BaseExpr String
+    | BaseExpr Text
     deriving(Show, Eq)
 
 program :: Parser [Declaration]
@@ -176,7 +176,7 @@ safety :: Parser PPDirective
 safety = do
     try (string "safety")
     space
-    level <- oneOf "012"
+    level <- oneOf ['0', '1', '2'] <?> "'0', '1' or '2'"
     space
     return $ Safety $ read [level]
 
@@ -184,9 +184,9 @@ safety = do
 blockStmt :: Parser Block
 blockStmt = do
     space
-    char '{' <?> "Expected '{'"
+    char '{'
     space
-    dec <- manyTill declaration (char '}') <?> "error in BlockStmt"
+    dec <- manyTill declaration (char '}')
     space
     return $ Block dec
 
@@ -348,7 +348,7 @@ relationExpr = do
 additionExpr :: Parser Expression
 additionExpr = do
     lhs <- multiplicationExpr
-    op  <- option ' ' (try (oneOf "+-"))
+    op  <- option ' ' (try (oneOf ['+', '-']))
     case op of
         '+' -> BinaryExpr lhs TokenType.PLUS <$> multiplicationExpr
         '-' -> BinaryExpr lhs TokenType.MINUS <$> multiplicationExpr
@@ -357,7 +357,7 @@ additionExpr = do
 multiplicationExpr :: Parser Expression
 multiplicationExpr = do
     lhs <- unaryExpr
-    op  <- option ' ' (try (oneOf "*/"))
+    op  <- option ' ' (try (oneOf ['*', '/']))
     case op of
         '*' -> BinaryExpr lhs TokenType.MUL <$> unaryExpr
         '/' -> BinaryExpr lhs TokenType.DIV <$> unaryExpr
@@ -365,7 +365,7 @@ multiplicationExpr = do
 
 unaryExpr :: Parser Expression
 unaryExpr = do
-    op <- option ' ' (try (oneOf "!-"))
+    op <- option ' ' (try (oneOf ['!', '-']))
     case op of
         '!' -> UnaryExpr TokenType.EXCL_MARK <$> unaryExpr
         '-' -> UnaryExpr TokenType.MINUS <$> unaryExpr
@@ -384,15 +384,10 @@ callExpr = do
 
 baseExpr :: Parser Expression
 baseExpr =
-    BaseExpr
-        <$> try (some digitChar)
-        <|> BaseExpr
-        <$> try (string "true" :: Parser Text)
-        <|> BaseExpr
-        <$> try (string "null" :: Parser Text)
-        <|> BaseExpr
-        <$> try getIdentifier
-        <?> "Expected base expression"
+    (BaseExpr <$> try (T.pack <$> some digitChar))
+        <|> (BaseExpr <$> try (string "true" :: Parser Text))
+        <|> (BaseExpr <$> try (string "null" :: Parser Text))
+        <|> (BaseExpr <$> try getIdentifier)
 
 groupingExpr :: Parser Expression
 groupingExpr = between (char '(') (char ')') expression
@@ -407,7 +402,7 @@ getArgs = do
     where idfs = many $ char ',' >> expression
 
 
-parameters :: Parser [(String, String)]
+parameters :: Parser [(Text, Text)]
 parameters = do
     par   <- var
     comma <- optional $ char ','
@@ -415,7 +410,7 @@ parameters = do
         Nothing -> return [par]
         Just x  -> parameters <?> "expecting parameter"
 
-var :: Parser (String, String)
+var :: Parser (Text, Text)
 var = do
     space
     typ <- getIdentifier
@@ -426,14 +421,9 @@ var = do
 
 
 getIdentifier :: Parser Text
-getIdentifier = some letterChar <> many alphaNumChar
+getIdentifier = T.pack <$> some letterChar <> many alphaNumChar
 
 getString :: Parser Text
 getString = do
-    satisfy (== '"')
-    str <- many text
-    satisfy (== '"')
-    return str
+    T.pack <$> between (char '"') (char '"') (many (text))
     where text = satisfy (/= '"')
-
-

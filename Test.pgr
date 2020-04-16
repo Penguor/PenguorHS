@@ -7,5 +7,6 @@ system SHello
     }
     system B
     {
+        test
     }
 }
