@@ -22,6 +22,7 @@ description: Please see the README on GitHub at <https://github.com/Penguor/Peng
 dependencies:
   - base >= 4.7 && < 5
   - megaparsec
+  - text
 
 library:
   source-dirs: src
@@ -36,6 +37,7 @@ executables:
       - -with-rtsopts=-N
     dependencies:
       - megaparsec
+      - text
       - PenguorHS
 
 tests:

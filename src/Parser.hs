@@ -1,24 +1,28 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parser where
 
 
 import           Data.Maybe
 import           Data.Data
 import           Data.Void
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer    as Lexer
+import qualified Text.Megaparsec.Char.Lexer    as L
 
 import qualified Parser.TokenType              as TokenType
 
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
 data Declaration =
-      System String String Block
-    | Container String String Block
-    | Datatype String String Block
-    | Var String String
+      System Text Text Block
+    | Container Text Text Block
+    | Datatype Text Text Block
+    | Var Text Text
     | Function String String [(String, String)] Block
     | Library String Block
     | Stmt Statement
@@ -63,7 +67,7 @@ data Expression =
     deriving(Show, Eq)
 
 program :: Parser [Declaration]
-program = some declaration <* eof
+program = some declaration <* space <* eof
 
 declaration :: Parser Declaration
 declaration =
@@ -109,7 +113,7 @@ dtypeDec = do
     space
     Datatype name par <$> blockStmt
 
-parent :: Parser (String)
+parent :: Parser Text
 parent = option "" (try $ char '<' >> space >> getIdentifier)
 
 
@@ -383,9 +387,9 @@ baseExpr =
     BaseExpr
         <$> try (some digitChar)
         <|> BaseExpr
-        <$> try (string "true")
+        <$> try (string "true" :: Parser Text)
         <|> BaseExpr
-        <$> try (string "null")
+        <$> try (string "null" :: Parser Text)
         <|> BaseExpr
         <$> try getIdentifier
         <?> "Expected base expression"
@@ -421,10 +425,10 @@ var = do
     return (typ, name)
 
 
-getIdentifier :: Parser String
+getIdentifier :: Parser Text
 getIdentifier = some letterChar <> many alphaNumChar
 
-getString :: Parser String
+getString :: Parser Text
 getString = do
     satisfy (== '"')
     str <- many text
