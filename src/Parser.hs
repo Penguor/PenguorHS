@@ -392,7 +392,7 @@ getCall = do
             return [BaseCall b]
         Just x -> do
             idf  <- getIdentifier
-            next <- lookAhead (try text) <* space
+            next <- lookAhead (try anySingle) <* space
             case next of
                 '.' -> do
                     rest <- getCall <* space
@@ -405,19 +405,12 @@ getCall = do
 
 baseExpr :: Parser Expression
 baseExpr =
-    BaseExpr
-        <$> try (some digitChar)
-        <|> BaseExpr
-        <$> try (string "true")
-        <|> BaseExpr
-        <$> try (string "false")
-        <|> BaseExpr
-        <$> try (string "null")
-        <|> BaseExpr
-        <$> try getIdentifier
-        <|> BaseExpr
-        <$> getString
-        <?> "Expected base expression"
+    (BaseExpr <$> try (T.pack <$> some digitChar))
+        <|> (BaseExpr <$> try (string "true"))
+        <|> (BaseExpr <$> try (string "false"))
+        <|> (BaseExpr <$> try (string "null"))
+        <|> (BaseExpr <$> try getIdentifier)
+        <|> (BaseExpr <$> getString)
 
 groupingExpr :: Parser Expression
 groupingExpr = between (char '(') (char ')') expression
@@ -443,10 +436,8 @@ parameters = do
 var :: Parser (Text, Text)
 var = do
     space
-    typ <- getIdentifier
-    space
-    name <- getIdentifier
-    space
+    typ  <- getIdentifier <* space
+    name <- getIdentifier <* space
     return (typ, name)
 
 

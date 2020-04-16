@@ -52,8 +52,8 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
+      - hspec-megaparsec
       - megaparsec
-
 
   unit-tests:
     main: Spec.hs
@@ -66,4 +66,5 @@ tests:
       - PenguorHS
       - hspec
       - hspec-discover
+      - hspec-megaparsec
       - megaparsec
