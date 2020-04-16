@@ -64,18 +64,20 @@ program = many1 declaration
 
 declaration :: Parser Declaration
 declaration =
-    try sysDec
-        <|> try contDec
-        <|> try dtypeDec
-        <|> try varDec
-        <|> try functionDec
-        <|> try libDec
-        <|> try (Stmt <$> statement)
+    spaces
+        >> (   try sysDec
+           <|> try contDec
+           <|> try dtypeDec
+           <|> try varDec
+           <|> try functionDec
+           <|> try libDec
+           <|> try (Stmt <$> statement)
+           )
 
 
 sysDec :: Parser Declaration
 sysDec = do
-    string "system" <?> "expecting 'system'"
+    string "system"
     spaces
     name <- getIdentifier
     spaces
@@ -86,7 +88,7 @@ sysDec = do
 
 contDec :: Parser Declaration
 contDec = do
-    string "container" <?> "expecting 'container'"
+    string "container"
     spaces
     name <- getIdentifier
     spaces
@@ -158,12 +160,9 @@ include = string "include" >> oneSpaces >> Include <$> getIdentifier
 
 fromIncl :: Parser PPDirective
 fromIncl = do
-    try (string "from")
-    spaces
-    lib <- getIdentifier
-    spaces
-    string "include"
-    spaces
+    string "from" <* spaces
+    lib <- getIdentifier <* spaces
+    string "include" <* spaces
     FromIncl lib <$> getIdentifier
 
 safety :: Parser PPDirective
