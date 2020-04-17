@@ -1,4 +1,4 @@
-if(test)
+system Test
 {
     system A
     {

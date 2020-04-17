@@ -87,33 +87,24 @@ declaration =
 
 sysDec :: Parser Declaration
 sysDec = do
-    string "system"
-    space
-    name <- getIdentifier
-    space
-    par <- parent
-    space
+    string "system" <* space
+    name <- getIdentifier <* space
+    par  <- parent <* space
     System name par <$> blockStmt
 
 
 contDec :: Parser Declaration
 contDec = do
-    string "container"
-    space
-    name <- getIdentifier
-    space
-    par <- parent
-    space
+    string "container" <* space
+    name <- getIdentifier <* space
+    par  <- parent <* space
     Container name par <$> blockStmt
 
 dtypeDec :: Parser Declaration
 dtypeDec = do
-    string "datatype"
-    space
-    name <- getIdentifier
-    space
-    par <- parent
-    space
+    string "datatype" <* space
+    name <- getIdentifier <* space
+    par  <- parent <* space
     Datatype name par <$> blockStmt
 
 parent :: Parser Text

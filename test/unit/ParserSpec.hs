@@ -5,51 +5,55 @@ module ParserSpec where
 import           Test.Hspec
 import           Test.Hspec.Megaparsec
 import           Text.Megaparsec
-import Data.Text
+import           Data.Text
 
-import qualified Parser
+import qualified Parser                        as P
 
 
-spec = do
-    describe "program" $ do
-        let program = parse Parser.program ""
-        it "can parse several declarations" $ do
-            program "system STest {} container CTest {} datatype DTest {}"
-                `shouldParse` [ Parser.System "STest" "" (Parser.Block [])
-                              , Parser.Container "CTest" "" (Parser.Block [])
-                              , Parser.Datatype "DTest" "" (Parser.Block [])
-                              ]
+spec = describe "program" $ do
+    let program = parse P.program ""
+    it "can parse several declarations"
+        $ program "system STest {} container CTest {} datatype DTest {}"
+        `shouldParse` [ P.System "STest" "" (P.Block [])
+                      , P.Container "CTest" "" (P.Block [])
+                      , P.Datatype "DTest" "" (P.Block [])
+                      ]
 
-        describe "declaration" $ do
-            let declaration = parse Parser.declaration ""
-            it "can execute the system parser" $ do
-                declaration "system Test {}"
-                    `shouldParse` Parser.System "Test" "" (Parser.Block [])
-            it "can execute the container parser" $ do
-                declaration "container Test {}"
-                    `shouldParse` Parser.Container "Test" "" (Parser.Block [])
-            it "can execute the datatype parser" $ do
-                declaration "datatype Test {}"
-                    `shouldParse` Parser.Datatype "Test" "" (Parser.Block [])
-            it "can execute the variable parser" $ do
-                declaration "var int test;" `shouldParse` Parser.Var "int" "test"
-            it "can execute the function parser" $ do
-                declaration "fn int Test() {}" `shouldParse` Parser.Function
-                    "int"
-                    "Test"
-                    []
-                    (Parser.Block [])
-            it "can execute the library parser" $ do
-                declaration "library Test {}"
-                    `shouldParse` Parser.Library "Test" (Parser.Block [])
-            it "can execute the statement parser" $ do
-                declaration "#include Core" `shouldParse` Parser.Stmt
-                    (Parser.PPStmt (Parser.Include "Core"))
+    describe "declaration" $ do
+        let declaration = parse P.declaration ""
+        it "can execute the system parser"
+            $             declaration "system Test {}"
+            `shouldParse` P.System "Test" "" (P.Block [])
+        describe "sysDec" $ do
+            let sysDec = parse P.sysDec ""
+            it "can parse systems"
+                $             sysDec "system Test < Super {}"
+                `shouldParse` P.System "Test" "Super" (P.Block [])
 
-            describe "statement" $ do
-                let statement = parse Parser.statement ""
-                it "can execute the preprocessor statement parser" $ do
-                    statement "#safety 2" `shouldParse` Parser.PPStmt (Parser.Safety 2)
-                it "can execute the if statement parser" $ do
-                    pendingWith "to be implemented"
+        it "can execute the container parser"
+            $             declaration "container Test {}"
+            `shouldParse` P.Container "Test" "" (P.Block [])
+        it "can execute the datatype parser"
+            $             declaration "datatype Test {}"
+            `shouldParse` P.Datatype "Test" "" (P.Block [])
+        it "can execute the variable parser"
+            $             declaration "var int test;"
+            `shouldParse` P.Var "int" "test"
+        it "can execute the function parser"
+            $             declaration "fn int Test() {}"
+            `shouldParse` P.Function "int" "Test" [] (P.Block [])
+        it "can execute the library parser"
+            $             declaration "library Test {}"
+            `shouldParse` P.Library "Test" (P.Block [])
+        it "can execute the statement parser"
+            $             declaration "#include Core"
+            `shouldParse` P.Stmt (P.PPStmt (P.Include "Core"))
+
+        describe "statement" $ do
+            let statement = parse P.statement ""
+            it "can execute the preprocessor statement parser"
+                $             statement "#safety 2"
+                `shouldParse` P.PPStmt (P.Safety 2)
+            it "can execute the if statement parser"
+                $ pendingWith "to be implemented"
 
