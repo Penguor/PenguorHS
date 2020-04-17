@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module PLexer
     ( tokenize
     , Token(..)
@@ -5,103 +7,88 @@ module PLexer
 where
 
 
-import           Data.Char
+--import           Data.Char
+
+import           Data.Void
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+
+import           Text.Megaparsec         hiding ( Token )
+import           Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer    as L
+
 import qualified Parser.TokenType              as TokenType
 
 
-data Token = Token { token :: String, tType :: TokenType.TokenType}
+data Token = Token { token :: Text, tType :: TokenType.TokenType, pos :: SourcePos}
     deriving(Show, Eq)
 
+type Parser = Parsec Void Text
+
+skipSpace :: Parser ()
+skipSpace = L.space space1
+                    (L.skipLineComment "//" :: Parser ())
+                    (L.skipBlockComment "/*" "*/" :: Parser ())
+
+lexeme = L.lexeme skipSpace
+symbol = L.symbol skipSpace
 
 
-tokenize :: String -> [Token]
-tokenize "" = [Token "" TokenType.EOF]
-tokenize (x : xs)
-    | x == ' ' = tokenize xs
-    | isAlpha x = buildIdf (x : xs)
-    | isDigit x = buildNum (x : xs)
-    | x == '"' = buildString xs
-    | -- todo: line position counter
-      isNewLine x = tokenize xs
-    | x == '/' = buildComment xs
-    | x == '#' = Token "#" TokenType.HASHTAG : buildIdf xs
-    | x == '&' = if head xs == '&'
-        then Token "&&" TokenType.AND : tokenize (tail xs)
-        else do
-            error "missing &"
-            [Token "" TokenType.OTHER]
-    | x == '|' = if head xs == '|'
-        then Token "&&" TokenType.OR : tokenize (tail xs)
-        else do
-            error "missing |"
-            [Token "" TokenType.OTHER]
-    | x == '=' = if head xs == '='
-        then Token "==" TokenType.EQUALS : tokenize (tail xs)
-        else Token "=" TokenType.ASSIGN : tokenize xs
-    | x == '+' = Token "+" TokenType.PLUS : tokenize xs
-    | x == '-' = Token "-" TokenType.MINUS : tokenize xs
-    | x == '*' = Token "*" TokenType.MUL : tokenize xs
-    | x == '(' = Token "(" TokenType.LPAREN : tokenize xs
-    | x == ')' = Token ")" TokenType.RPAREN : tokenize xs
-    | x == '{' = Token "[" TokenType.LBRACE : tokenize xs
-    | x == '}' = Token "[" TokenType.RBRACE : tokenize xs
-    | x == '[' = Token "[" TokenType.LBRACK : tokenize xs
-    | x == ']' = Token "[" TokenType.RBRACK : tokenize xs
-    | x == ':' = Token "[" TokenType.COLON : tokenize xs
-    | x == ';' = Token "[" TokenType.SEMICOLON : tokenize xs
-    | x == '<' = Token "[" TokenType.LESS : tokenize xs
-    | x == '>' = Token "[" TokenType.GREATER : tokenize xs
+tokenize :: Parser [Token]
+tokenize = many getToken <* eof
 
+getToken :: Parser Token
+getToken = do
+    pos <- getSourcePos
+    choice [buildIdf, buildNum, buildString, getOther]
 
+buildIdf :: Parser Token
+buildIdf = do
+    pos <- getSourcePos
+    choice
+        [ Token "fn" TokenType.HASHTAG pos <$ symbol "fn"
+        , Token "null" TokenType.HASHTAG pos <$ symbol "null"
+        , Token "system" TokenType.HASHTAG pos <$ symbol "system"
+        , Token "component" TokenType.HASHTAG pos <$ symbol "component"
+        , Token "datatype" TokenType.HASHTAG pos <$ symbol "datatype"
+        , Token "if" TokenType.HASHTAG pos <$ symbol "if"
+        , Token "while" TokenType.HASHTAG pos <$ symbol "while"
+        , Token "for" TokenType.HASHTAG pos <$ symbol "for"
+        , Token "do" TokenType.HASHTAG pos <$ symbol "do"
+        , Token "from" TokenType.HASHTAG pos <$ symbol "from"
+        , Token "include" TokenType.HASHTAG pos <$ symbol "include"
+        , Token "var" TokenType.HASHTAG pos <$ symbol "var"
+        , Token "true" TokenType.HASHTAG pos <$ symbol "true"
+        , Token "false" TokenType.HASHTAG pos <$ symbol "false"
+        , Token "switch" TokenType.HASHTAG pos <$ symbol "switch"
+        , Token "case" TokenType.HASHTAG pos <$ symbol "case"
+        , getIdf pos
+        ]
 
-buildIdf :: String -> [Token]
-buildIdf xs
-    | idf == "fn"        = Token "fn" TokenType.FN : tokenize rest
-    | idf == "null"      = Token "null" TokenType.NULL : tokenize rest
-    | idf == "system"    = Token "system" TokenType.SYSTEM : tokenize rest
-    | idf == "component" = Token "component" TokenType.COMPONENT : tokenize rest
-    | idf == "datatype"  = Token "datatype" TokenType.DATATYPE : tokenize rest
-    | idf == "if"        = Token "if" TokenType.IF : tokenize rest
-    | idf == "while"     = Token "while" TokenType.WHILE : tokenize rest
-    | idf == "for"       = Token "for" TokenType.FOR : tokenize rest
-    | idf == "do"        = Token "do" TokenType.DO : tokenize rest
-    | idf == "from"      = Token "from" TokenType.FROM : tokenize rest
-    | idf == "include"   = Token "include" TokenType.INCLUDE : tokenize rest
-    | idf == "var"       = Token "var" TokenType.VAR : tokenize rest
-    | idf == "true"      = Token "true" TokenType.TRUE : tokenize rest
-    | idf == "false"     = Token "false" TokenType.FALSE : tokenize rest
-    | idf == "switch"    = Token "switch" TokenType.SWITCH : tokenize rest
-    | idf == "case"      = Token "case" TokenType.CASE : tokenize rest
-    | otherwise          = Token idf TokenType.IDF : tokenize rest
-    where (idf, rest) = span isAlphaNum xs
+getIdf :: SourcePos -> Parser Token
+getIdf pos = do
+    first <- lexeme (letterChar <|> char '_')
+    rest  <- many (alphaNumChar <|> char '_')
+    return $ Token (T.pack (first : rest)) TokenType.IDF pos
 
+buildNum :: Parser Token
+buildNum = do
+    pos   <- getSourcePos
+    front <- some digitChar
+    dot   <- optional (char '.')
+    case dot of
+        Nothing -> return $ Token (T.pack front) TokenType.NUM pos
+        Just _  -> do
+            rest <- some digitChar
+            return $ Token (T.pack (front ++ "." ++ rest)) TokenType.NUM pos
 
-buildNum :: String -> [Token]
-buildNum xs = Token num TokenType.NUM : tokenize rest
-    where (num, rest) = span isNumChr xs
+buildString :: Parser Token
+buildString = do
+    pos <- getSourcePos
+    str <- between (symbol "\"") (symbol "\"") (many anySingle)
+    return $ Token (T.pack str) TokenType.STRING pos
 
-buildString :: String -> [Token]
-buildString xs = Token str TokenType.STRING : tokenize (drop 1 rest)
-    where (str, rest) = span (/= quote) xs
-
-buildComment :: String -> [Token]
-buildComment (x : xs)
-    | -- todo: debug line comment
-      x == '/' = tokenize (dropWhile isNewLine xs)
-    | x == '*' = if head xs == '/'
-        then tokenize (tail xs)
-        else buildComment (dropWhile (/= '*') xs)
-
-
-quote :: Char
-quote = '"'
-
-isNewLine :: Char -> Bool
-isNewLine '\n' = True
-isNewLine '\r' = True
-isNewLine _    = False
-
-isNumChr :: Char -> Bool
-isNumChr x | x `elem` ['0' .. '9'] = True
-           | x == '.'              = True
-           | otherwise             = False
+getOther :: Parser Token
+getOther = do
+    pos <- getSourcePos
+    choice [Token "+" TokenType.PLUS pos <$ symbol "+"]
