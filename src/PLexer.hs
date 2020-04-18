@@ -1,27 +1,22 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module PLexer
     ( tokenize
-    , Token(..)
     )
 where
 
-
---import           Data.Char
 
 import           Data.Void
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 
-import           Text.Megaparsec         hiding ( Token )
+import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer    as L
 
-import qualified Parser.TokenType              as TokenType
+import           Parser.Token
 
-
-data Token = Token { token :: Text, tType :: TokenType.TokenType, pos :: SourcePos}
-    deriving(Show, Eq)
 
 type Parser = Parsec Void Text
 
@@ -30,65 +25,89 @@ skipSpace = L.space space1
                     (L.skipLineComment "//" :: Parser ())
                     (L.skipBlockComment "/*" "*/" :: Parser ())
 
+lexeme :: Parser a -> Parser a
 lexeme = L.lexeme skipSpace
+
+symbol :: Tokens Text -> Parser Text
 symbol = L.symbol skipSpace
 
 
-tokenize :: Parser [Token]
+tokenize :: Parser [Tok]
 tokenize = many getToken <* eof
 
-getToken :: Parser Token
-getToken = do
-    pos <- getSourcePos
-    choice [buildIdf, buildNum, buildString, getOther]
+getToken :: Parser Tok
+getToken = choice [buildIdf, buildNum, buildString, getOther]
 
-buildIdf :: Parser Token
+buildIdf :: Parser Tok
 buildIdf = do
     pos <- getSourcePos
     choice
-        [ Token "fn" TokenType.HASHTAG pos <$ symbol "fn"
-        , Token "null" TokenType.HASHTAG pos <$ symbol "null"
-        , Token "system" TokenType.HASHTAG pos <$ symbol "system"
-        , Token "component" TokenType.HASHTAG pos <$ symbol "component"
-        , Token "datatype" TokenType.HASHTAG pos <$ symbol "datatype"
-        , Token "if" TokenType.HASHTAG pos <$ symbol "if"
-        , Token "while" TokenType.HASHTAG pos <$ symbol "while"
-        , Token "for" TokenType.HASHTAG pos <$ symbol "for"
-        , Token "do" TokenType.HASHTAG pos <$ symbol "do"
-        , Token "from" TokenType.HASHTAG pos <$ symbol "from"
-        , Token "include" TokenType.HASHTAG pos <$ symbol "include"
-        , Token "var" TokenType.HASHTAG pos <$ symbol "var"
-        , Token "true" TokenType.HASHTAG pos <$ symbol "true"
-        , Token "false" TokenType.HASHTAG pos <$ symbol "false"
-        , Token "switch" TokenType.HASHTAG pos <$ symbol "switch"
-        , Token "case" TokenType.HASHTAG pos <$ symbol "case"
+        [ Tok FN pos <$ symbol "fn"
+        , Tok NULL pos <$ symbol "null"
+        , Tok SYSTEM pos <$ symbol "system"
+        , Tok CONTAINER pos <$ symbol "container"
+        , Tok DATATYPE pos <$ symbol "datatype"
+        , Tok LIBRARY pos <$ symbol "library"
+        , Tok IF pos <$ symbol "if"
+        , Tok WHILE pos <$ symbol "while"
+        , Tok FOR pos <$ symbol "for"
+        , Tok DO pos <$ symbol "do"
+        , Tok FROM pos <$ symbol "from"
+        , Tok INCLUDE pos <$ symbol "include"
+        , Tok VAR pos <$ symbol "var"
+        , Tok TRUE pos <$ symbol "true"
+        , Tok FALSE pos <$ symbol "false"
+        , Tok SWITCH pos <$ symbol "switch"
+        , Tok CASE pos <$ symbol "case"
         , getIdf pos
         ]
 
-getIdf :: SourcePos -> Parser Token
+getIdf :: SourcePos -> Parser Tok
 getIdf pos = do
     first <- lexeme (letterChar <|> char '_')
     rest  <- many (alphaNumChar <|> char '_')
-    return $ Token (T.pack (first : rest)) TokenType.IDF pos
+    return $ Tok (IDF (T.pack (first : rest))) pos
 
-buildNum :: Parser Token
+buildNum :: Parser Tok
 buildNum = do
     pos   <- getSourcePos
     front <- some digitChar
     dot   <- optional (char '.')
     case dot of
-        Nothing -> return $ Token (T.pack front) TokenType.NUM pos
+        Nothing -> return $ Tok (NUM (T.pack front)) pos
         Just _  -> do
             rest <- some digitChar
-            return $ Token (T.pack (front ++ "." ++ rest)) TokenType.NUM pos
+            return $ Tok (NUM (T.pack (front ++ "." ++ rest))) pos
 
-buildString :: Parser Token
+buildString :: Parser Tok
 buildString = do
     pos <- getSourcePos
     str <- between (symbol "\"") (symbol "\"") (many anySingle)
-    return $ Token (T.pack str) TokenType.STRING pos
+    return $ Tok (STRING (T.pack str)) pos
 
-getOther :: Parser Token
+getOther :: Parser Tok
 getOther = do
     pos <- getSourcePos
-    choice [Token "+" TokenType.PLUS pos <$ symbol "+"]
+    choice
+        [ Tok PLUS pos <$ symbol "+"
+        , Tok MINUS pos <$ symbol "-"
+        , Tok MUL pos <$ symbol "*"
+        , Tok DIV pos <$ symbol "/"
+        , Tok LPAREN pos <$ symbol "("
+        , Tok RPAREN pos <$ symbol ")"
+        , Tok LBRACE pos <$ symbol "{"
+        , Tok RBRACE pos <$ symbol "}"
+        , Tok LBRACK pos <$ symbol "["
+        , Tok RBRACK pos <$ symbol "]"
+        , Tok COLON pos <$ symbol ":"
+        , Tok SEMICOLON pos <$ symbol ";"
+        , Tok LESS_EQUALS pos <$ symbol "<="
+        , Tok GREATER_EQUALS pos <$ symbol ">="
+        , Tok LESS pos <$ symbol "<"
+        , Tok GREATER pos <$ symbol ">"
+        , Tok AND pos <$ symbol "&&"
+        , Tok OR pos <$ symbol "||"
+        , Tok HASHTAG pos <$ symbol "#"
+        , Tok RBRACK pos <$ symbol "=="
+        , Tok RBRACK pos <$ symbol "="
+        ]
