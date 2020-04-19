@@ -300,7 +300,6 @@ callExpr :: Parser Expression
 callExpr = do
     base <- getIdentifier
     idfs <- many $ getByType DOT >> getIdentifier
-
     temp <- optional $ getByType LPAREN
     case temp of
         Nothing -> return $ CallExpr (base : idfs) []
