@@ -49,6 +49,8 @@ buildIdf = do
         , Tok DATATYPE pos <$ symbol "datatype"
         , Tok LIBRARY pos <$ symbol "library"
         , Tok IF pos <$ symbol "if"
+        , Tok ELIF pos <$ symbol "elif"
+        , Tok ELSE pos <$ symbol "else"
         , Tok WHILE pos <$ symbol "while"
         , Tok FOR pos <$ symbol "for"
         , Tok DO pos <$ symbol "do"
@@ -66,7 +68,7 @@ getIdf :: SourcePos -> Parser Tok
 getIdf pos = do
     first <- lexeme (letterChar <|> char '_')
     rest  <- many (alphaNumChar <|> char '_')
-    return $ Tok (IDF (T.pack (first : rest))) pos
+    return $ TokTxt IDF pos (T.pack (first : rest))
 
 buildNum :: Parser Tok
 buildNum = do
@@ -74,16 +76,16 @@ buildNum = do
     front <- some digitChar
     dot   <- optional (char '.')
     case dot of
-        Nothing -> return $ Tok (NUM (T.pack front)) pos
+        Nothing -> return $ TokTxt NUM pos (T.pack front)
         Just _  -> do
             rest <- some digitChar
-            return $ Tok (NUM (T.pack (front ++ "." ++ rest))) pos
+            return $ TokTxt NUM pos (T.pack (front ++ "." ++ rest))
 
 buildString :: Parser Tok
 buildString = do
     pos <- getSourcePos
     str <- between (symbol "\"") (symbol "\"") (many anySingle)
-    return $ Tok (STRING (T.pack str)) pos
+    return $ TokTxt STRING pos (T.pack str)
 
 getOther :: Parser Tok
 getOther = do
@@ -99,6 +101,8 @@ getOther = do
         , Tok RBRACE pos <$ symbol "}"
         , Tok LBRACK pos <$ symbol "["
         , Tok RBRACK pos <$ symbol "]"
+        , Tok DOT pos <$ symbol "."
+        , Tok COMMA pos <$ symbol ","
         , Tok COLON pos <$ symbol ":"
         , Tok SEMICOLON pos <$ symbol ";"
         , Tok LESS_EQUALS pos <$ symbol "<="

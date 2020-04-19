@@ -1,10 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Parser.Token
     ( Tok(..)
     , TType(..)
     , getByType
+    , content
     )
 where
 
@@ -15,7 +17,7 @@ import           Text.Megaparsec
 
 type Parser = Parsec Void [Tok]
 
-data Tok = Tok { typ :: TType, pos :: SourcePos }
+data Tok = Tok { typ :: TType, pos :: SourcePos } | TokTxt { typ :: TType, pos :: SourcePos, txt :: Text}
     deriving(Show, Eq, Ord)
 
 data TType = HASHTAG
@@ -32,9 +34,9 @@ data TType = HASHTAG
     | NULL
     | COLON | SEMICOLON | DOT | COMMA | EXCL_MARK
     | VAR
-    | NUM {content :: Text}
-    | STRING {content :: Text}
-    | IDF {content :: Text}
+    | NUM
+    | STRING
+    | IDF
     | TRUE | FALSE
     | FN
     | CONTAINER | SYSTEM | DATATYPE
@@ -56,5 +58,7 @@ getByType t = do
     tk <- anySingle
     if t == typ tk then return tk else fail $ "expecting" ++ show t
 
-
-
+content :: Text -> Parser Tok
+content a = do
+    tk <- choice [getByType NUM, getByType STRING, getByType IDF]
+    if a == txt tk then return tk else fail $ "expecting" ++ show a
