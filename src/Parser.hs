@@ -13,18 +13,19 @@ import           Data.Text.Read
 import           Text.Megaparsec         hiding ( single )
 import qualified Text.Megaparsec               as MP
                                                 ( single )
+import           Text.Megaparsec.Debug
 
 import           Parser.Token
 import           PLexer
 
 
 
-type Parser = Parsec Void [Tok]
+type Parser = Parsec Void PStream
 
 data Declaration =
-      System Text Text Block
-    | Container Text Text Block
-    | Datatype Text Text Block
+      System Text (Maybe Text) Block
+    | Container Text (Maybe Text) Block
+    | Datatype Text (Maybe Text) Block
     | Var Text Text
     | Function Text Text [(Text, Text)] Block
     | Library Text Block
@@ -75,20 +76,28 @@ program = some declaration
 
 declaration :: Parser Declaration
 declaration = choice
-    [sysDec, contDec, dtypeDec, varDec, functionDec, libDec, Stmt <$> statement]
+    [ try sysDec
+    , try contDec
+    , try dtypeDec
+    , try varDec
+    , try functionDec
+    , try libDec
+    , Stmt <$> statement
+    ]
 
 
 sysDec :: Parser Declaration
 sysDec = do
-    getByType SYSTEM
-    name <- getIdentifier
-    par  <- parent
-    System name par <$> blockStmt
+    getByType SYSTEM <?> "system"
+    name  <- dbg "system name" (getIdentifier <?> "system name")
+    par   <- dbg "system parent" parent
+    block <- dbg "system block" blockStmt
+    return $ System name par block
 
 
 contDec :: Parser Declaration
 contDec = do
-    getByType CONTAINER
+    getByType CONTAINER <?> "container"
     name <- getIdentifier
     par  <- parent
     Container name par <$> blockStmt
@@ -100,8 +109,9 @@ dtypeDec = do
     par  <- parent
     Datatype name par <$> blockStmt
 
-parent :: Parser Text
-parent = option "" (try $ getByType LESS >> getIdentifier)
+parent :: Parser (Maybe Text)
+parent = dbg "parent"
+    $ optional (try (getByType LESS) >> (getIdentifier <?> "parent name"))
 
 
 varDec :: Parser Declaration
@@ -157,8 +167,9 @@ safety = do
 
 
 blockStmt :: Parser Block
-blockStmt =
-    Block <$> between (getByType LBRACE) (getByType RBRACE) (many declaration)
+blockStmt = dbg "block" $ Block <$> between (getByType LBRACE)
+                                            (getByType RBRACE)
+                                            (many declaration)
 
 ifStmt :: Parser Statement
 ifStmt = do

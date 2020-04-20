@@ -4,12 +4,20 @@ module Build
 where
 
 import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Text.Megaparsec
 import           Parser
 import           PLexer                         ( tokenize )
+import           Parser.Token                   ( PStream(..) )
 
 buildFromSource :: Text -> IO ()
-buildFromSource input =
-    either (fail "unknown error") (parseTest program) (parse tokenize "" input)
+buildFromSource input = do
+    parseTest tokenize input
+    either (putStrLn <$> errorBundlePretty)
+           (parseTest program)
+           (stream <$> toks)
+  where
+    toks = parse tokenize "" input
+    stream a = PStream { streamInput = T.unpack input, streamTokens = a }
 
 
