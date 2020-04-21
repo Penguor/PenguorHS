@@ -1,4 +1,4 @@
-system Test 
+system Test < Test
 {
 
 }

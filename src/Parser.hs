@@ -5,6 +5,7 @@ module Parser where
 
 import           Data.Maybe
 import           Data.Data
+import qualified Data.Set                      as Set
 import           Data.Void
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
@@ -110,8 +111,12 @@ dtypeDec = do
     Datatype name par <$> blockStmt
 
 parent :: Parser (Maybe Text)
-parent = dbg "parent"
-    $ optional (try (getByType LESS) >> (getIdentifier <?> "parent name"))
+parent =
+    dbg "parent"
+        $  optional
+        $  try
+        $  getByType LESS
+        >> (getIdentifier <|> failure Nothing (formList))
 
 
 varDec :: Parser Declaration
@@ -369,3 +374,4 @@ getIdentifier = do
 --getString = do
 --    T.pack <$> between (getByType TType) (char '"') (many (text))
 --    where text = satisfy (/= '"')
+
