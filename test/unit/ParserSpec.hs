@@ -29,10 +29,14 @@ spec = describe "program" $ do
             it "can parse systems"
                 $             sysDec "system Test < Super {}"
                 `shouldParse` P.System "Test" "Super" (P.Block [])
-
         it "can execute the container parser"
             $             declaration "container Test {}"
             `shouldParse` P.Container "Test" "" (P.Block [])
+        describe "contDec" $ do
+            let contDec = parse P.contDec ""
+            it "can parse containers"
+                $             contDec "container Test < Super {}"
+                `shouldParse` P.Container "Test" "Super" (P.Block [])
         it "can execute the datatype parser"
             $             declaration "datatype Test {}"
             `shouldParse` P.Datatype "Test" "" (P.Block [])
