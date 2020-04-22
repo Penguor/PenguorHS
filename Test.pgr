@@ -1,4 +1,4 @@
-system SHello
+system Test
 {
     system A
     {
@@ -7,6 +7,5 @@ system SHello
     }
     system B
     {
-        test
     }
 }
