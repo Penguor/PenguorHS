@@ -28,6 +28,8 @@ lexeme = L.lexeme skipSpace
 symbol :: Tokens Text -> Parser Text
 symbol = L.symbol skipSpace
 
+newtype Program = Program [Declaration]
+
 data Declaration =
       System Text Text Block
     | Container Text Text Block
@@ -79,8 +81,8 @@ data Expression =
 data Call = IdfCall Text | FnCall Text [Expression] | BaseCall Expression
     deriving(Show, Eq)
 
-program :: Parser [Declaration]
-program = some declaration <* space <* eof
+program :: Parser Program
+program = Program <$> some declaration <* space <* eof
 
 declaration :: Parser Declaration
 declaration = space >> choice
