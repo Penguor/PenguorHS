@@ -1,11 +1,4 @@
-system Test
+for(pos : positions)
 {
-    system A
-    {
-        fn int Test(string Hallo) {
-        }
-    }
-    system B
-    {
-    }
+    result = result + pos;
 }

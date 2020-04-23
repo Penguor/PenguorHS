@@ -29,6 +29,7 @@ symbol :: Tokens Text -> Parser Text
 symbol = L.symbol skipSpace
 
 newtype Program = Program [Declaration]
+    deriving(Show, Eq)
 
 data Declaration =
       System Text Text Block
@@ -45,7 +46,7 @@ data Statement =
     | BlockStmt Block
     | IfStmt Expression [Statement] [Elif] [Statement]
     | WhileStmt Expression [Statement]
-    | ForStmt (Text, Text) Expression [Statement]
+    | ForStmt Text Expression [Statement]
     | DoStmt [Statement] Expression
     | SwitchStmt Text [Statement] [Statement]
     | CaseStmt Expression [Statement]
@@ -216,7 +217,7 @@ forStmt :: Parser Statement
 forStmt = do
     try $ string "for"
     symbol "("
-    element <- var <* symbol ":"
+    element <- getIdentifier <* symbol ":"
     list    <- expression
     symbol ")"
     code <- between (symbol "{") (symbol "}") (some statement)
@@ -386,10 +387,12 @@ getArgs = do
 parameters :: Parser [(Text, Text)]
 parameters = do
     par   <- var
-    comma <- optional $ char ','
+    comma <- optional $ symbol ","
     case comma of
         Nothing -> return [par]
-        Just x  -> parameters <?> "parameters"
+        Just x  -> do
+            rest <- parameters <?> "parameters"
+            return (par : rest)
 
 var :: Parser (Text, Text)
 var = do
