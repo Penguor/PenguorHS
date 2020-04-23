@@ -145,7 +145,7 @@ spec = describe "program" $ do
                                   ]
             it "can execute the for statement parser"
                 $ statement "for(pos : positions){result = result + pos;}"
-                `shouldParse` (P.ForStmt
+                `shouldParse` P.ForStmt
                                   "pos"
                                   (P.CallExpr [P.IdfCall "positions"])
                                   [ P.ExprStmt
@@ -159,5 +159,62 @@ spec = describe "program" $ do
                                             )
                                         )
                                   ]
-                              )
-
+            it "can execute the do statement parser"
+                $             statement "do{a = a + 1;} while(true);"
+                `shouldParse` P.DoStmt
+                                  [ P.ExprStmt
+                                        (P.AssignExpr
+                                            (P.CallExpr [P.IdfCall "a"])
+                                            (P.BinaryExpr
+                                                (P.CallExpr [P.IdfCall "a"])
+                                                PLUS
+                                                (P.CallExpr
+                                                    [ P.BaseCall
+                                                          (P.BaseExpr "1")
+                                                    ]
+                                                )
+                                            )
+                                        )
+                                  ]
+                                  (P.CallExpr [P.IdfCall "true"])
+            it "can execute the switch statement parser"
+                $             statement
+                                  "\
+\switch(test) \
+\{ \
+\    case 1: \
+\    case 2: \
+\        a = a + 1; \
+\    default: \
+\        a = 2; \
+\}"
+                `shouldParse` P.SwitchStmt
+                                  "test"
+                                  [ P.CaseStmt
+                                      (P.CallExpr [P.BaseCall (P.BaseExpr "1")])
+                                      []
+                                  , P.CaseStmt
+                                      (P.CallExpr [P.BaseCall (P.BaseExpr "2")])
+                                      [ P.ExprStmt
+                                            (P.AssignExpr
+                                                (P.CallExpr [P.IdfCall "a"])
+                                                (P.BinaryExpr
+                                                    (P.CallExpr [P.IdfCall "a"])
+                                                    PLUS
+                                                    (P.CallExpr
+                                                        [ P.BaseCall
+                                                              (P.BaseExpr "1")
+                                                        ]
+                                                    )
+                                                )
+                                            )
+                                      ]
+                                  ]
+                                  [ P.ExprStmt
+                                        (P.AssignExpr
+                                            (P.CallExpr [P.IdfCall "a"])
+                                            (P.CallExpr
+                                                [P.BaseCall (P.BaseExpr "2")]
+                                            )
+                                        )
+                                  ]

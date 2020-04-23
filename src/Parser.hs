@@ -229,13 +229,14 @@ doStmt = do
     code <- between (symbol "{") (symbol "}") (some statement)
     symbol "while"
     condition <- between (symbol "(") (symbol ")") expression
+    symbol ";"
     return $ DoStmt code condition
 
 switchStmt :: Parser Statement
 switchStmt = do
     symbol "switch"
     idf <- between (symbol "(") (symbol ")") getIdentifier
-    symbol "}"
+    symbol "{"
     cases   <- some caseStmt
     testDef <- optional (string "default")
     case testDef of
@@ -249,8 +250,10 @@ switchStmt = do
 caseStmt :: Parser Statement
 caseStmt = do
     symbol "case"
-    expr <- between (symbol "(") (symbol ")") expression
-    code <- many statement
+    expr <- expression <* symbol ":"
+    code <- manyTill
+        statement
+        (choice [lookAhead (symbol "case"), lookAhead (symbol "default")])
     return $ CaseStmt expr code
 
 exprStmt :: Parser Statement

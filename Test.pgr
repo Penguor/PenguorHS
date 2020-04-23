@@ -1,4 +1,8 @@
-for(pos : positions)
+switch(test)
 {
-    result = result + pos;
+    case 1:
+    case 2:
+        a = a + 1;
+    default:
+        a = 2;
 }
