@@ -1,8 +1,1 @@
-switch(test)
-{
-    case 1:
-    case 2:
-        a = a + 1;
-    default:
-        a = 2;
-}
+a = b;

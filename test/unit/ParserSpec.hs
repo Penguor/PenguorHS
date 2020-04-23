@@ -218,3 +218,9 @@ spec = describe "program" $ do
                                             )
                                         )
                                   ]
+            it "can execute the expression statement parser"
+                $             statement "a = b;"
+                `shouldParse` P.ExprStmt
+                                  (P.AssignExpr (P.CallExpr [P.IdfCall "a"])
+                                                (P.CallExpr [P.IdfCall "b"])
+                                  )
