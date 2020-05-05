@@ -276,7 +276,6 @@ orExpr :: Parser Expression
 orExpr = do
     lhs <- lexeme andExpr
     op  <- option "" (symbol "||")
-    space
     case op of
         "||" -> BinaryExpr lhs TokenType.OR <$> orExpr
         _    -> return lhs
@@ -285,7 +284,6 @@ andExpr :: Parser Expression
 andExpr = do
     lhs <- lexeme equalityExpr
     op  <- option "" (symbol "&&")
-    space
     case op of
         "&&" -> BinaryExpr lhs TokenType.AND <$> andExpr
         _    -> return lhs
@@ -294,7 +292,6 @@ equalityExpr :: Parser Expression
 equalityExpr = do
     lhs <- lexeme relationExpr
     op  <- option "" $ choice [symbol "==", symbol "!="]
-    space
     case op of
         "==" -> BinaryExpr lhs TokenType.EQUALS <$> equalityExpr
         "!=" -> BinaryExpr lhs TokenType.NEQUALS <$> equalityExpr
@@ -368,12 +365,12 @@ getCall = do
 
 baseExpr :: Parser Expression
 baseExpr =
-    (BaseExpr <$> try (T.pack <$> some digitChar))
-        <|> (BaseExpr <$> try (string "true"))
-        <|> (BaseExpr <$> try (string "false"))
-        <|> (BaseExpr <$> try (string "null"))
+    (NumExpr <$> choice [try (lexeme L.float), try (lexeme L.decimal)])
+        <|> (BaseExpr <$> try (symbol "true"))
+        <|> (BaseExpr <$> try (symbol "false"))
+        <|> (BaseExpr <$> try (symbol "null"))
         <|> (BaseExpr <$> try getIdentifier)
-        <|> (BaseExpr <$> getString)
+        <|> (StringExpr <$> getString)
 
 groupingExpr :: Parser Expression
 groupingExpr = between (char '(') (char ')') expression
@@ -407,7 +404,10 @@ var = do
 
 
 getIdentifier :: Parser Text
-getIdentifier = T.pack <$> lexeme (some letterChar <> many alphaNumChar)
+getIdentifier = T.pack <$> lexeme (some validFirst <> many validOther)
+  where
+    validFirst = choice [letterChar, char '_']
+    validOther = choice [alphaNumChar, char '_']
 
 getString :: Parser Text
 getString = T.pack <$> between (char '"') (char '"') (many text)
