@@ -1,11 +1,31 @@
-system Test
+#safety 1
+
+#include Math
+#include Hello
+
+library ShowPenguor
 {
-    system A
+    system HelloWorld < Parent
     {
-        fn int Test(string Hallo) {
+        fn void execute(string name)
+        {
+            var string a;
+            a = "Hello " + name;
+            if(true || false) 
+            {
+                print.print;
+            }
         }
     }
-    system B
+
+    container HelloData
     {
+        var string n1;
+        var string n2; 
+        var string n3; 
+
+        n1 = "Peter";
+        n2 = "Frank";
+        n3 = "Anna";
     }
 }

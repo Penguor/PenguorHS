@@ -29,14 +29,15 @@ symbol :: Tokens Text -> Parser Text
 symbol = L.symbol skipSpace
 
 newtype Program = Program [Declaration]
+    deriving(Show, Eq)
 
 data Declaration =
-      System Text Text Block
-    | Container Text Text Block
-    | Datatype Text Text Block
-    | Var Text Text
-    | Function Text Text [(Text, Text)] Block
-    | Library Text Block
+      System Expression (Maybe Expression) Block
+    | Container Expression (Maybe Expression) Block
+    | Datatype Expression (Maybe Expression) Block
+    | Var Expression Expression
+    | Function Expression Expression [(Expression, Expression)] Block
+    | Library Expression Block
     | Stmt Statement
     deriving(Show, Eq)
 
@@ -45,16 +46,16 @@ data Statement =
     | BlockStmt Block
     | IfStmt Expression [Statement] [Elif] [Statement]
     | WhileStmt Expression [Statement]
-    | ForStmt (Text, Text) Expression [Statement]
+    | ForStmt Expression Expression [Statement]
     | DoStmt [Statement] Expression
-    | SwitchStmt Text [Statement] [Statement]
+    | SwitchStmt Expression [Statement] [Statement]
     | CaseStmt Expression [Statement]
     | ExprStmt Expression
     deriving(Show, Eq)
 
 data PPDirective =
-      Include Text
-    | FromIncl Text Text
+      Include Expression
+    | FromIncl Expression Expression
     | Safety Integer
     deriving(Show, Eq)
 
@@ -70,15 +71,17 @@ data Expression =
     | BooleanExpr Bool
     | CallExpr [Call]
     | GroupingExpr Expression
-    | IdentifierExpr Text
+    | IdfExpr Text
     | NullExpr
     | NumExpr Double
     | StringExpr Text
     | UnaryExpr TokenType.TokenType Expression
-    | BaseExpr Text
+    | BaseExpr TokenType.TokenType
     deriving(Show, Eq)
 
-data Call = IdfCall Text | FnCall Text [Expression] | BaseCall Expression
+data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
+
+
     deriving(Show, Eq)
 
 program :: Parser Program
@@ -118,15 +121,14 @@ dtypeDec = do
     par  <- parent
     Datatype name par <$> blockStmt
 
-parent :: Parser Text
-parent = option "" (try $ symbol "<" >> getIdentifier)
+parent :: Parser (Maybe Expression)
+parent = optional (try $ symbol "<" >> getIdentifier)
 
 
 varDec :: Parser Declaration
 varDec = do
     symbol "var"
-    typ  <- getIdentifier
-    name <- getIdentifier <* symbol ";"
+    (typ, name) <- var <* symbol ";"
     return $ Var typ name
 
 functionDec :: Parser Declaration
@@ -172,6 +174,7 @@ fromIncl = do
     symbol "include"
     FromIncl lib <$> getIdentifier
 
+
 safety :: Parser PPDirective
 safety = do
     symbol "safety"
@@ -216,7 +219,7 @@ forStmt :: Parser Statement
 forStmt = do
     try $ string "for"
     symbol "("
-    element <- var <* symbol ":"
+    element <- getIdentifier <* symbol ":"
     list    <- expression
     symbol ")"
     code <- between (symbol "{") (symbol "}") (some statement)
@@ -228,13 +231,14 @@ doStmt = do
     code <- between (symbol "{") (symbol "}") (some statement)
     symbol "while"
     condition <- between (symbol "(") (symbol ")") expression
+    symbol ";"
     return $ DoStmt code condition
 
 switchStmt :: Parser Statement
 switchStmt = do
     symbol "switch"
     idf <- between (symbol "(") (symbol ")") getIdentifier
-    symbol "}"
+    symbol "{"
     cases   <- some caseStmt
     testDef <- optional (string "default")
     case testDef of
@@ -248,8 +252,10 @@ switchStmt = do
 caseStmt :: Parser Statement
 caseStmt = do
     symbol "case"
-    expr <- between (symbol "(") (symbol ")") expression
-    code <- many statement
+    expr <- expression <* symbol ":"
+    code <- manyTill
+        statement
+        (choice [lookAhead (symbol "case"), lookAhead (symbol "default")])
     return $ CaseStmt expr code
 
 exprStmt :: Parser Statement
@@ -271,7 +277,6 @@ orExpr :: Parser Expression
 orExpr = do
     lhs <- lexeme andExpr
     op  <- option "" (symbol "||")
-    space
     case op of
         "||" -> BinaryExpr lhs TokenType.OR <$> orExpr
         _    -> return lhs
@@ -280,7 +285,6 @@ andExpr :: Parser Expression
 andExpr = do
     lhs <- lexeme equalityExpr
     op  <- option "" (symbol "&&")
-    space
     case op of
         "&&" -> BinaryExpr lhs TokenType.AND <$> andExpr
         _    -> return lhs
@@ -289,7 +293,6 @@ equalityExpr :: Parser Expression
 equalityExpr = do
     lhs <- lexeme relationExpr
     op  <- option "" $ choice [symbol "==", symbol "!="]
-    space
     case op of
         "==" -> BinaryExpr lhs TokenType.EQUALS <$> equalityExpr
         "!=" -> BinaryExpr lhs TokenType.NEQUALS <$> equalityExpr
@@ -342,33 +345,29 @@ callExpr = CallExpr <$> getCall
 
 getCall :: Parser [Call]
 getCall = do
-    base <- optional (lookAhead (try getIdentifier))
-    space
+    base <- baseExpr
     case base of
-        Nothing -> do
-            b <- baseExpr
-            return [BaseCall b]
-        Just x -> do
-            idf  <- getIdentifier
-            next <- lookAhead (try anySingle) <* space
+        IdfExpr _ -> do
+            next <- option ' ' $ try $ lexeme (oneOf ['(', '.'])
             case next of
                 '.' -> do
-                    rest <- getCall <* space
-                    return (IdfCall idf : rest)
+                    rest <- lexeme getCall
+                    return (BaseCall base : rest)
                 '(' -> do
                     args <- getArgs <* space <* char ')' <* space
                     rest <- getCall <* space
-                    return (FnCall idf args : rest)
-                _ -> return [IdfCall idf]
+                    return (FnCall base args : rest)
+                _ -> return [BaseCall base]
+        _ -> return [BaseCall base]
 
 baseExpr :: Parser Expression
 baseExpr =
-    (BaseExpr <$> try (T.pack <$> some digitChar))
-        <|> (BaseExpr <$> try (string "true"))
-        <|> (BaseExpr <$> try (string "false"))
-        <|> (BaseExpr <$> try (string "null"))
-        <|> (BaseExpr <$> try getIdentifier)
-        <|> (BaseExpr <$> getString)
+    (NumExpr <$> choice [try (lexeme L.float), try (lexeme L.decimal)])
+        <|> (BaseExpr TokenType.TRUE <$ try (symbol "true"))
+        <|> (BaseExpr TokenType.FALSE <$ try (symbol "false"))
+        <|> (BaseExpr TokenType.NULL <$ try (symbol "null"))
+        <|> try getIdentifier
+        <|> (StringExpr <$> getString)
 
 groupingExpr :: Parser Expression
 groupingExpr = between (char '(') (char ')') expression
@@ -383,15 +382,17 @@ getArgs = do
     where idfs = many $ char ',' >> expression
 
 
-parameters :: Parser [(Text, Text)]
+parameters :: Parser [(Expression, Expression)]
 parameters = do
     par   <- var
-    comma <- optional $ char ','
+    comma <- optional $ symbol ","
     case comma of
         Nothing -> return [par]
-        Just x  -> parameters <?> "parameters"
+        Just x  -> do
+            rest <- parameters <?> "parameters"
+            return (par : rest)
 
-var :: Parser (Text, Text)
+var :: Parser (Expression, Expression)
 var = do
     space
     typ  <- getIdentifier
@@ -399,9 +400,13 @@ var = do
     return (typ, name)
 
 
-getIdentifier :: Parser Text
-getIdentifier = T.pack <$> lexeme (some letterChar <> many alphaNumChar)
+getIdentifier :: Parser Expression
+getIdentifier = IdfExpr . T.pack <$> lexeme
+    (some validFirst <> many validOther)
+  where
+    validFirst = choice [letterChar, char '_']
+    validOther = choice [alphaNumChar, char '_']
 
 getString :: Parser Text
-getString = T.pack <$> between (char '"') (char '"') (many text)
+getString = T.pack <$> between (symbol "\"") (symbol "\"") (many text)
     where text = satisfy (/= '"')

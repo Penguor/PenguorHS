@@ -9,4 +9,3 @@ import           Parser
 
 buildFromSource :: Text -> IO ()
 buildFromSource input = parseTest program input
-
