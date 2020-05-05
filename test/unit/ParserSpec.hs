@@ -107,11 +107,47 @@ spec = describe "program" $ do
         it "can execute the statement parser"
             $             declaration "#include Core"
             `shouldParse` P.Stmt (P.PPStmt (P.Include "Core"))
+
         describe "statement" $ do
             let statement = parse P.statement ""
             it "can execute the preprocessor statement parser"
                 $             statement "#safety 2"
                 `shouldParse` P.PPStmt (P.Safety 2)
+            describe "preProcessorStmt" $ do
+                let preProcessorStmt = parse P.preProcessorStmt ""
+                it "can parse preprocessor statements"
+                    $             preProcessorStmt "#include Math"
+                    `shouldParse` P.PPStmt (P.Include "Math")
+                describe "ppDirective" $ do
+                    let ppDirective = parse P.ppDirective ""
+                    it "can parse preprocessor directives"
+                        $             ppDirective "include Test"
+                        `shouldParse` P.Include "Test"
+                    describe "include" $ do
+                        let include = parse P.include ""
+                        it "can parse library includes"
+                            $             include "include Test"
+                            `shouldParse` P.Include "Test"
+                    describe "fromIncl" $ do
+                        let fromIncl = parse P.fromIncl ""
+                        it "can parse from includes"
+                            $ fromIncl "from CoreLib include HelloWorld"
+                            `shouldParse` P.FromIncl "CoreLib" "HelloWorld"
+                    describe "safety" $ do
+                        let safety = parse P.safety ""
+                        it "can parse safety levels"
+                            $             safety "safety 1"
+                            `shouldParse` P.Safety 1
+                        context "when provided with invalid input"
+                            $ it "fails when provided with digits > 2"
+                            $ do
+                                  safety `shouldFailOn` "safety 3"
+                                  safety `shouldFailOn` "safety 4"
+                                  safety `shouldFailOn` "safety 5"
+                                  safety `shouldFailOn` "safety 6"
+                                  safety `shouldFailOn` "safety 7"
+                                  safety `shouldFailOn` "safety 8"
+                                  safety `shouldFailOn` "safety 9"
             it "can execute the if statement parser"
                 $             statement "if(true) {i=1;}"
                 `shouldParse` P.IfStmt
@@ -187,6 +223,8 @@ spec = describe "program" $ do
 \        a = a + 1; \
 \    default: \
 \        a = 2; \
+
+
 \}"
                 `shouldParse` P.SwitchStmt
                                   "test"

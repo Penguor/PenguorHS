@@ -1,1 +1,27 @@
-a = b;
+#safety 1
+
+#include Math
+#include Hello
+
+library ShowPenguor
+{
+    system HelloWorld < Parent
+    {
+        fn void execute(string name)
+        {
+            var string a;
+            a = "Hello " + name;
+        }
+    }
+
+    container HelloData
+    {
+        var string n1;
+        var string n2; 
+        var string n3; 
+
+        n1 = "Peter";
+        n2 = "Frank";
+        n3 = "Anna";
+    }
+}
