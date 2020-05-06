@@ -10,12 +10,13 @@ module Parser.Token
     , getByType
     , content
     , PStream(..)
+    , TokenPos(..)
     )
 where
 
-import           Data.Text                      ( Text
-                                                , unpack
-                                                )
+import qualified Data.Text                     as T
+                                         hiding ( Text )
+import           Data.Text                      ( Text )
 import           Data.Void
 import           Data.Proxy
 import qualified Data.List                     as DL
@@ -55,15 +56,18 @@ data TType = HASHTAG
     | OTHER
     deriving(Show, Eq, Ord)
 
-data Tok = Tok { typ :: TType, pos :: SourcePos, txt :: Text }
+data Tok = Tok { typ :: TType, pos :: TokenPos, txt :: Text }
+    deriving(Eq, Ord)
+
+data TokenPos = TokenPos {startPos :: SourcePos, endPos :: SourcePos, tokLength :: Int}
     deriving(Eq, Ord)
 
 instance Show Tok where
-    show a = "(Token type: " ++ show (typ a) ++ if unpack (txt a) == ""
+    show a = "(Token type: " ++ show (typ a) ++ if T.unpack (txt a) == ""
         then ")"
-        else ", value: " ++ unpack (txt a) ++ ")"
+        else ", value: " ++ T.unpack (txt a) ++ ")"
 
-data PStream = PStream { streamInput :: String, streamTokens :: [Tok]}
+data PStream = PStream { streamInput :: Text, streamTokens :: [Tok]}
 
 -- ! implement better version, currently just copied from https://markkarpov.com/tutorial/megaparsec.html
 
@@ -76,30 +80,31 @@ instance Stream PStream where
     chunkLength Proxy = length
     chunkEmpty Proxy = null
     take1_ (PStream _ []) = Nothing
-    take1_ (PStream str (t : ts)) =
-        Just (t, PStream (drop (tokensLength' Proxy (t NE.:| [])) str) ts)
-    takeN_ n (PStream str s)
+    take1_ (PStream input (t : ts)) =
+        Just (t, PStream (T.drop (tokLength (pos t)) input) ts)
+    takeN_ n (PStream input ts)
         | n <= 0
-        = Just ([], PStream str s)
-        | null s
+        = Just ([], PStream input ts)
+        | null ts
         = Nothing
         | otherwise
-        = let (x, s') = splitAt n s
+        = let (x, ts') = splitAt n ts
           in  case NE.nonEmpty x of
-                  Nothing -> Just (x, PStream str s')
+                  Nothing -> Just (x, PStream input ts')
                   Just nex ->
-                      Just (x, PStream (drop (tokensLength' Proxy nex) str) s')
-    takeWhile_ f (PStream str s) =
-        let (x, s') = DL.span f s
+                      Just (x, PStream (T.drop (tokensLength pxy nex) input) ts)
+    takeWhile_ f (PStream input s) =
+        let (x, ts) = DL.span f s
         in  case NE.nonEmpty x of
-                Nothing -> (x, PStream str s')
+                Nothing -> (x, PStream input ts)
                 Just nex ->
-                    (x, PStream (drop (tokensLength' Proxy nex) str) s')
+                    (x, PStream (T.drop (tokensLength pxy nex) input) ts)
     showTokens Proxy = show
+    tokensLength Proxy ts = sum (tokLength . pos <$> ts)
     reachOffset o PosState {..} =
         ( prefix ++ restOfLine
         , PosState
-            { pstateInput      = PStream { streamInput  = postStr
+            { pstateInput      = PStream { streamInput  = T.pack postStr
                                          , streamTokens = post
                                          }
             , pstateOffset     = max pstateOffset o
@@ -113,25 +118,24 @@ instance Stream PStream where
         sameLine     = sourceLine newSourcePos == sourceLine pstateSourcePos
         newSourcePos = case post of
             []      -> pstateSourcePos
-            (x : _) -> pos x
+            (x : _) -> startPos (pos x)
         (pre, post) = splitAt (o - pstateOffset) (streamTokens pstateInput)
-        (preStr, postStr) = splitAt tokensConsumed (streamInput pstateInput)
+        (preStr, postStr) =
+            splitAt tokensConsumed (T.unpack (streamInput pstateInput))
         tokensConsumed = case NE.nonEmpty pre of
             Nothing    -> 0
-            Just nePre -> tokensLength' Proxy nePre
+            Just nePre -> tokensLength pxy nePre
         restOfLine = takeWhile (/= '\n') postStr
 
-
-tokensLength' :: Proxy PStream -> NonEmpty (Token PStream) -> Int
-tokensLength' a b = tokensLength a b
-
+pxy :: Proxy PStream
+pxy = Proxy
 
 getByType :: TType -> Parser Tok
 getByType t = do
     tk <- anySingle
-    if t == typ tk then return tk else fail $ "expecting" ++ show t
+    if t == typ tk then return tk else fail $ "expecting " ++ show t
 
 content :: Text -> Parser Tok
 content a = do
     tk <- choice [getByType NUM, getByType STRING, getByType IDF]
-    if a == txt tk then return tk else fail $ "expecting" ++ show a
+    if a == txt tk then return tk else fail $ "expecting " ++ show a

@@ -37,83 +37,95 @@ tokenize :: Parser [Tok]
 tokenize = many getToken <* eof
 
 getToken :: Parser Tok
-getToken = skipSpace
-    >> choice [try buildIdf, try buildNum, try buildString, try getOther]
+getToken =
+    skipSpace >> choice [try buildIdf, try buildNum, try buildString, getOther]
 
 buildIdf :: Parser Tok
-buildIdf = do
-    pos <- getSourcePos
-    choice
-        [ Tok FN pos "" <$ symbol "fn"
-        , Tok NULL pos "" <$ symbol "null"
-        , Tok SYSTEM pos "" <$ symbol "system"
-        , Tok CONTAINER pos "" <$ symbol "container"
-        , Tok DATATYPE pos "" <$ symbol "datatype"
-        , Tok LIBRARY pos "" <$ symbol "library"
-        , Tok IF pos "" <$ symbol "if"
-        , Tok ELIF pos "" <$ symbol "elif"
-        , Tok ELSE pos "" <$ symbol "else"
-        , Tok WHILE pos "" <$ symbol "while"
-        , Tok FOR pos "" <$ symbol "for"
-        , Tok DO pos "" <$ symbol "do"
-        , Tok FROM pos "" <$ symbol "from"
-        , Tok INCLUDE pos "" <$ symbol "include"
-        , Tok VAR pos "" <$ symbol "var"
-        , Tok TRUE pos "" <$ symbol "true"
-        , Tok FALSE pos "" <$ symbol "false"
-        , Tok SWITCH pos "" <$ symbol "switch"
-        , Tok CASE pos "" <$ symbol "case"
-        , getIdf pos
-        ]
+buildIdf = choice
+    [ tokBySymbol "fn"        FN        ""
+    , tokBySymbol "null"      NULL      ""
+    , tokBySymbol "system"    SYSTEM    ""
+    , tokBySymbol "container" CONTAINER ""
+    , tokBySymbol "datatype"  DATATYPE  ""
+    , tokBySymbol "library"   LIBRARY   ""
+    , tokBySymbol "if"        IF        ""
+    , tokBySymbol "elif"      ELIF      ""
+    , tokBySymbol "else"      ELSE      ""
+    , tokBySymbol "while"     WHILE     ""
+    , tokBySymbol "for"       FOR       ""
+    , tokBySymbol "do"        DO        ""
+    , tokBySymbol "from"      FROM      ""
+    , tokBySymbol "include"   INCLUDE   ""
+    , tokBySymbol "var"       VAR       ""
+    , tokBySymbol "true"      TRUE      ""
+    , tokBySymbol "false"     FALSE     ""
+    , tokBySymbol "switch"    SWITCH    ""
+    , tokBySymbol "case"      CASE      ""
+    , getIdf
+    ]
 
-getIdf :: SourcePos -> Parser Tok
-getIdf pos = do
+getIdf :: Parser Tok
+getIdf = do
+    pos1  <- getSourcePos
     first <- lexeme (letterChar <|> char '_')
     rest  <- many (alphaNumChar <|> char '_')
-    return $ Tok IDF pos (T.pack (first : rest))
+    pos2  <- getSourcePos
+    let cp = T.pack (first : rest)
+    return $ Tok IDF (TokenPos pos1 pos2 (T.length cp)) cp
 
 buildNum :: Parser Tok
 buildNum = do
-    pos   <- getSourcePos
+    pos1  <- getSourcePos
     front <- some digitChar
     dot   <- optional (char '.')
     case dot of
-        Nothing -> return $ Tok NUM pos (T.pack front)
-        Just _  -> do
+        Nothing -> do
+            pos2 <- getSourcePos
+            return $ Tok NUM (TokenPos pos1 pos2 (length front)) (T.pack front)
+        Just _ -> do
             rest <- some digitChar
-            return $ Tok NUM pos (T.pack (front ++ "." ++ rest))
+            pos2 <- getSourcePos
+            let cp = T.pack (front ++ "." ++ rest)
+            return $ Tok NUM (TokenPos pos1 pos2 (T.length cp)) cp
 
 buildString :: Parser Tok
 buildString = do
-    pos <- getSourcePos
-    str <- between (symbol "\"") (symbol "\"") (many anySingle)
-    return $ Tok STRING pos (T.pack str)
+    pos1 <- getSourcePos
+    str  <- between (symbol "\"") (symbol "\"") (many anySingle)
+    pos2 <- getSourcePos
+    return $ Tok STRING (TokenPos pos1 pos2 (length str)) (T.pack str)
 
 getOther :: Parser Tok
-getOther = do
-    pos <- getSourcePos
-    choice
-        [ Tok PLUS pos "" <$ symbol "+"
-        , Tok MINUS pos "" <$ symbol "-"
-        , Tok MUL pos "" <$ symbol "*"
-        , Tok DIV pos "" <$ symbol "/"
-        , Tok LPAREN pos "" <$ symbol "("
-        , Tok RPAREN pos "" <$ symbol ")"
-        , Tok LBRACE pos "" <$ symbol "{"
-        , Tok RBRACE pos "" <$ symbol "}"
-        , Tok LBRACK pos "" <$ symbol "["
-        , Tok RBRACK pos "" <$ symbol "]"
-        , Tok DOT pos "" <$ symbol "."
-        , Tok COMMA pos "" <$ symbol ","
-        , Tok COLON pos "" <$ symbol ":"
-        , Tok SEMICOLON pos "" <$ symbol ";"
-        , Tok LESS_EQUALS pos "" <$ symbol "<="
-        , Tok GREATER_EQUALS pos "" <$ symbol ">="
-        , Tok LESS pos "" <$ symbol "<"
-        , Tok GREATER pos "" <$ symbol ">"
-        , Tok AND pos "" <$ symbol "&&"
-        , Tok OR pos "" <$ symbol "||"
-        , Tok HASHTAG pos "" <$ symbol "#"
-        , Tok RBRACK pos "" <$ symbol "=="
-        , Tok RBRACK pos "" <$ symbol "="
-        ]
+getOther = choice
+    [ tokBySymbol "+"  PLUS           ""
+    , tokBySymbol "-"  MINUS          ""
+    , tokBySymbol "*"  MUL            ""
+    , tokBySymbol "/"  DIV            ""
+    , tokBySymbol "("  LPAREN         ""
+    , tokBySymbol ")"  RPAREN         ""
+    , tokBySymbol "{"  LBRACE         ""
+    , tokBySymbol "}"  RBRACE         ""
+    , tokBySymbol "["  LBRACK         ""
+    , tokBySymbol "]"  RBRACK         ""
+    , tokBySymbol "."  DOT            ""
+    , tokBySymbol ","  COMMA          ""
+    , tokBySymbol ":"  COLON          ""
+    , tokBySymbol ";"  SEMICOLON      ""
+    , tokBySymbol "<=" LESS_EQUALS    ""
+    , tokBySymbol ">=" GREATER_EQUALS ""
+    , tokBySymbol "<"  LESS           ""
+    , tokBySymbol ">"  GREATER        ""
+    , tokBySymbol "&&" AND            ""
+    , tokBySymbol "||" OR             ""
+    , tokBySymbol "#"  HASHTAG        ""
+    , tokBySymbol "==" RBRACK         ""
+    , tokBySymbol "="  RBRACK         ""
+    ]
+
+
+tokBySymbol :: Text -> TType -> Text -> Parser Tok
+tokBySymbol str t vl = do
+    pos1 <- getSourcePos
+    symbol str
+    pos2 <- getSourcePos
+    return $ Tok t (TokenPos pos1 pos2 (T.length str)) vl

@@ -97,7 +97,7 @@ declaration = choice
 
 sysDec :: Parser Declaration
 sysDec = do
-    getByType SYSTEM <?> "system"
+    dbg "sysDec" (getByType SYSTEM <?> "system")
     name <- getIdentifier <?> "system name"
     par  <- parent
     System name par <$> blockStmt
@@ -146,7 +146,14 @@ libDec = do
 
 statement :: Parser Statement
 statement = choice
-    [preProcessorStmt, ifStmt, whileStmt, forStmt, doStmt, switchStmt, exprStmt]
+    [ try preProcessorStmt
+    , try ifStmt
+    , try whileStmt
+    , try forStmt
+    , try doStmt
+    , try switchStmt
+    , exprStmt
+    ]
 
 
 preProcessorStmt :: Parser Statement
