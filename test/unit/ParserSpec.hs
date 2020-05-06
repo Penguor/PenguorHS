@@ -7,12 +7,14 @@ import           Test.Hspec.Megaparsec
 import           Text.Megaparsec
 import           Data.Text
 
+import           Build
 import qualified Parser                        as P
-import           Parser.TokenType
+import           Parser.Token
+
 
 
 spec = describe "program" $ do
-    let program = parse P.program ""
+    let program a = buildFromSource P.program a
     it "can parse multiple declarations"
         $ program "system STest {} container CTest {} datatype DTest {}"
         `shouldParse` P.Program
@@ -22,12 +24,12 @@ spec = describe "program" $ do
                           ]
 
     describe "declaration" $ do
-        let declaration = parse P.declaration ""
+        let declaration = buildFromSource P.declaration
         it "can execute the system parser"
             $             declaration "system Test {}"
             `shouldParse` P.System (P.IdfExpr "Test") Nothing (P.Block [])
         describe "sysDec" $ do
-            let sysDec = parse P.sysDec ""
+            let sysDec = buildFromSource P.sysDec
             it "can parse systems"
                 $             sysDec "system Test < Super {}"
                 `shouldParse` P.System (P.IdfExpr "Test")
@@ -37,7 +39,7 @@ spec = describe "program" $ do
             $             declaration "container Test {}"
             `shouldParse` P.Container (P.IdfExpr "Test") Nothing (P.Block [])
         describe "contDec" $ do
-            let contDec = parse P.contDec ""
+            let contDec = buildFromSource P.contDec
             it "can parse containers"
                 $             contDec "container Test < Super {}"
                 `shouldParse` P.Container (P.IdfExpr "Test")
@@ -165,15 +167,11 @@ spec = describe "program" $ do
             it "can execute the if statement parser"
                 $             statement "if(true) {i=1;}"
                 `shouldParse` P.IfStmt
-                                  (P.CallExpr [P.BaseCall (P.BaseExpr TRUE)])
+                                  (P.CallExpr [P.BaseExpr TRUE] [])
                                   [ P.ExprStmt
                                         (P.AssignExpr
-                                            (P.CallExpr
-                                                [P.BaseCall ((P.IdfExpr "i"))]
-                                            )
-                                            (P.CallExpr
-                                                [P.BaseCall (P.NumExpr 1)]
-                                            )
+                                            (P.CallExpr [P.IdfExpr "i"] [])
+                                            (P.CallExpr [P.NumExpr 1] [])
                                         )
                                   ]
                                   []
@@ -183,53 +181,33 @@ spec = describe "program" $ do
                 `shouldParse` P.WhileStmt
                                   (P.UnaryExpr
                                       EXCL_MARK
-                                      (P.CallExpr
-                                          [P.BaseCall (P.IdfExpr "active")]
-                                      )
+                                      (P.CallExpr [P.IdfExpr "active"] [])
                                   )
                                   [ P.ExprStmt
                                         (P.AssignExpr
-                                            (P.CallExpr
-                                                [ P.BaseCall
-                                                      (P.IdfExpr "result")
-                                                ]
-                                            )
+                                            (P.CallExpr [P.IdfExpr "result"] [])
                                             (P.BinaryExpr
-                                                (P.CallExpr
-                                                    [P.BaseCall (P.IdfExpr "a")]
-                                                )
+                                                (P.CallExpr [P.IdfExpr "a"] [])
                                                 PLUS
-                                                (P.CallExpr
-                                                    [P.BaseCall (P.IdfExpr "b")]
-                                                )
+                                                (P.CallExpr [P.IdfExpr "b"] [])
                                             )
                                         )
                                   ]
             it "can execute the for statement parser"
-                $ statement "for(pos : positions){result = result + pos;}"
+                $ statement "for(Pos pos : positions){result = result + pos;}"
                 `shouldParse` P.ForStmt
-                                  (P.IdfExpr "pos")
-                                  (P.CallExpr
-                                      [P.BaseCall (P.IdfExpr "positions")]
-                                  )
+                                  (P.IdfExpr "pos", P.IdfExpr "pos")
+                                  (P.CallExpr [P.IdfExpr "positions"] [])
                                   [ P.ExprStmt
                                         (P.AssignExpr
-                                            (P.CallExpr
-                                                [ P.BaseCall
-                                                      (P.IdfExpr "result")
-                                                ]
-                                            )
+                                            (P.CallExpr [P.IdfExpr "result"] [])
                                             (P.BinaryExpr
                                                 (P.CallExpr
-                                                    [ P.BaseCall
-                                                          (P.IdfExpr "result")
-                                                    ]
+                                                    [P.IdfExpr "result"]
+                                                    []
                                                 )
                                                 PLUS
-                                                (P.CallExpr
-                                                    [ P.BaseCall
-                                                          (P.IdfExpr "pos")
-                                                    ]
+                                                (P.CallExpr [P.IdfExpr "pos"] []
                                                 )
                                             )
                                         )
@@ -239,21 +217,15 @@ spec = describe "program" $ do
                 `shouldParse` P.DoStmt
                                   [ P.ExprStmt
                                         (P.AssignExpr
-                                            (P.CallExpr
-                                                [P.BaseCall (P.IdfExpr "a")]
-                                            )
+                                            (P.CallExpr [P.IdfExpr "a"] [])
                                             (P.BinaryExpr
-                                                (P.CallExpr
-                                                    [P.BaseCall (P.IdfExpr "a")]
-                                                )
+                                                (P.CallExpr [P.IdfExpr "a"] [])
                                                 PLUS
-                                                (P.CallExpr
-                                                    [P.BaseCall (P.NumExpr 1)]
-                                                )
+                                                (P.CallExpr [P.NumExpr 1] [])
                                             )
                                         )
                                   ]
-                                  (P.CallExpr [P.BaseCall (P.BaseExpr TRUE)])
+                                  (P.CallExpr [P.BaseExpr TRUE] [])
             it "can execute the switch statement parser"
                 $             statement
                                   "\
@@ -270,119 +242,92 @@ spec = describe "program" $ do
 \}"
                 `shouldParse` P.SwitchStmt
                                   (P.IdfExpr "test")
-                                  [ P.CaseStmt
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 1)])
-                                      []
+                                  [ P.CaseStmt (P.CallExpr [P.NumExpr 1] []) []
                                   , P.CaseStmt
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 2)])
+                                      (P.CallExpr [P.NumExpr 2] [])
                                       [ P.ExprStmt
                                             (P.AssignExpr
-                                                (P.CallExpr
-                                                    [P.BaseCall (P.IdfExpr "a")]
-                                                )
+                                                (P.CallExpr [P.IdfExpr "a"] [])
                                                 (P.BinaryExpr
                                                     (P.CallExpr
-                                                        [ P.BaseCall
-                                                              (P.IdfExpr "a")
-                                                        ]
+                                                        [P.IdfExpr "a"]
+                                                        []
                                                     )
                                                     PLUS
-                                                    (P.CallExpr
-                                                        [ P.BaseCall
-                                                              (P.NumExpr 1)
-                                                        ]
+                                                    (P.CallExpr [P.NumExpr 1] []
                                                     )
                                                 )
                                             )
                                       ]
                                   ]
-                                  [ P.ExprStmt
-                                        (P.AssignExpr
-                                            (P.CallExpr
-                                                [P.BaseCall (P.IdfExpr "a")]
+                                  (Just
+                                      [ P.ExprStmt
+                                            (P.AssignExpr
+                                                (P.CallExpr [P.IdfExpr "a"] [])
+                                                (P.CallExpr [P.NumExpr 2] [])
                                             )
-                                            (P.CallExpr
-                                                [P.BaseCall (P.NumExpr 2)]
-                                            )
-                                        )
-                                  ]
+                                      ]
+                                  )
             it "can execute the expression statement parser"
                 $             statement "a = b;"
                 `shouldParse` P.ExprStmt
                                   (P.AssignExpr
-                                      (P.CallExpr [P.BaseCall (P.IdfExpr "a")])
-                                      (P.CallExpr [P.BaseCall (P.IdfExpr "b")])
+                                      (P.CallExpr [P.IdfExpr "a"] [])
+                                      (P.CallExpr [P.IdfExpr "b"] [])
                                   )
             describe "expression" $ do
                 let expression = parse P.expression ""
                 it "can parse expressions"
                     $             expression "a = b;"
                     `shouldParse` P.AssignExpr
-                                      (P.CallExpr [P.BaseCall (P.IdfExpr "a")])
-                                      (P.CallExpr [P.BaseCall (P.IdfExpr "b")])
+                                      (P.CallExpr [P.IdfExpr "a"] [])
+                                      (P.CallExpr [P.IdfExpr "b"] [])
                 it "can parse assign expressions"
                     $             expression "name = \"Peter\";"
                     `shouldParse` P.AssignExpr
-                                      (P.CallExpr
-                                          [P.BaseCall (P.IdfExpr "name")]
-                                      )
-                                      (P.CallExpr
-                                          [P.BaseCall (P.StringExpr "Peter")]
-                                      )
+                                      (P.CallExpr [P.IdfExpr "name"] [])
+                                      (P.CallExpr [P.StringExpr "Peter"] [])
                 it "can parse or expressions"
                     $             expression "true || false;"
                     `shouldParse` P.BinaryExpr
-                                      (P.CallExpr [P.BaseCall (P.BaseExpr TRUE)]
-                                      )
+                                      (P.CallExpr [P.BaseExpr TRUE] [])
                                       OR
-                                      (P.CallExpr
-                                          [P.BaseCall (P.BaseExpr FALSE)]
-                                      )
+                                      (P.CallExpr [P.BaseExpr FALSE] [])
                 it "can parse and expressions"
                     $             expression "true && isEntity;" -- ! inspect why some expressions need a semicolon to parse
 
                     `shouldParse` P.BinaryExpr
-                                      (P.CallExpr [P.BaseCall (P.BaseExpr TRUE)]
-                                      )
+                                      (P.CallExpr [P.BaseExpr TRUE] [])
                                       AND
-                                      (P.CallExpr
-                                          [P.BaseCall (P.IdfExpr "isEntity")]
-                                      )
+                                      (P.CallExpr [P.IdfExpr "isEntity"] [])
                 it "can parse equality expressions"
                     $             expression "testVar == 54"
                     `shouldParse` P.BinaryExpr
-                                      (P.CallExpr
-                                          [P.BaseCall (P.IdfExpr "testVar")]
-                                      )
+                                      (P.CallExpr [P.IdfExpr "testVar"] [])
                                       EQUALS
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 54)])
+                                      (P.CallExpr [P.NumExpr 54] [])
                 it "can parse relation expressions"
                     $             expression "a1var <= 23.3"
                     `shouldParse` P.BinaryExpr
-                                      (P.CallExpr
-                                          [P.BaseCall (P.IdfExpr "a1var")]
-                                      )
+                                      (P.CallExpr [P.IdfExpr "a1var"] [])
                                       LESS_EQUALS
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 23.3)])
+                                      (P.CallExpr [P.NumExpr 233] [])
                 it "can parse addition expressions"
                     $             expression "i + 24"
                     `shouldParse` P.BinaryExpr
-                                      (P.CallExpr [P.BaseCall (P.IdfExpr "i")])
+                                      (P.CallExpr [P.IdfExpr "i"] [])
                                       PLUS
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 24)])
+                                      (P.CallExpr [P.NumExpr 24] [])
                 it "can parse multiplication expressions"
                     $             expression "t_var / 2"
                     `shouldParse` P.BinaryExpr
-                                      (P.CallExpr
-                                          [P.BaseCall (P.IdfExpr "t_var")]
-                                      )
+                                      (P.CallExpr [P.IdfExpr "t_var"] [])
                                       DIV
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 2)])
+                                      (P.CallExpr [P.NumExpr 2] [])
                 it "can parse unary expressions"
                     $             expression "-2"
-                    `shouldParse` P.UnaryExpr
-                                      MINUS
-                                      (P.CallExpr [P.BaseCall (P.NumExpr 2)])
+                    `shouldParse` P.UnaryExpr MINUS
+                                              (P.CallExpr [P.NumExpr 2] [])
                 it "can parse call expressions"
                     $             expression "test;"
-                    `shouldParse` P.CallExpr [P.BaseCall (P.IdfExpr "test")]
+                    `shouldParse` P.CallExpr [P.IdfExpr "test"] []

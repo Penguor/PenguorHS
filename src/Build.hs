@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Build
     ( buildFromSource
     )
@@ -10,12 +12,10 @@ import           Parser
 import           PLexer                         ( tokenize )
 import           Parser.Token                   ( PStream(..) )
 
-buildFromSource :: Text -> IO ()
-buildFromSource input = do
+buildFromSource :: (Show a) => Parser a -> Text -> IO ()
+buildFromSource p input = do
     parseTest tokenize input
-    either (putStrLn <$> errorBundlePretty)
-           (parseTest program)
-           (stream <$> toks)
+    either (putStrLn <$> errorBundlePretty) (parseTest p) (stream <$> toks)
   where
     toks = parse tokenize "" input
     stream a = PStream { streamInput = T.unpack input, streamTokens = a }

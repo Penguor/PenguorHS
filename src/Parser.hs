@@ -11,27 +11,20 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Text.Read
 
-import           Text.Megaparsec         hiding ( single )
+import           Text.Megaparsec         hiding ( single
+                                                , parse
+                                                )
 import qualified Text.Megaparsec               as MP
-                                                ( single )
+                                                ( single
+                                                , parse
+                                                )
 import           Text.Megaparsec.Debug
 
 import           Parser.Token
 import           PLexer
 
 
-
 type Parser = Parsec Void PStream
-
-skipSpace :: Parser ()
-skipSpace =
-    L.space space1 (L.skipLineComment "//") (L.skipBlockCommentNested "/*" "*/")
-
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme skipSpace
-
-symbol :: Tokens Text -> Parser Text
-symbol = L.symbol skipSpace
 
 newtype Program = Program [Declaration]
     deriving(Show, Eq)
@@ -51,9 +44,9 @@ data Statement =
     | BlockStmt Block
     | IfStmt Expression [Statement] [Elif] [Statement]
     | WhileStmt Expression [Statement]
-    | ForStmt Expression Expression [Statement]
+    | ForStmt (Expression, Expression) Expression [Statement]
     | DoStmt [Statement] Expression
-    | SwitchStmt Expression [Statement] [Statement]
+    | SwitchStmt Expression [Statement] (Maybe [Statement])
     | CaseStmt Expression [Statement]
     | ExprStmt Expression
     deriving(Show, Eq)
@@ -74,26 +67,24 @@ data Expression =
       AssignExpr Expression Expression
     | BinaryExpr Expression TType Expression
     | BooleanExpr Bool
-    | CallExpr [Call]
+    | CallExpr [Expression] [Expression]
     | GroupingExpr Expression
     | IdfExpr Text
     | NullExpr
     | NumExpr Double
     | StringExpr Text
-    | UnaryExpr TokenType.TokenType Expression
-    | BaseExpr TokenType.TokenType
+    | UnaryExpr TType Expression
+    | BaseExpr TType
     deriving(Show, Eq)
 
-data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
-
-
-    deriving(Show, Eq)
+-- data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
+--    deriving(Show, Eq)
 
 program :: Parser Program
-program = Program <$> some declaration <* space <* eof
+program = Program <$> some declaration
 
 declaration :: Parser Declaration
-declaration = space >> choice
+declaration = choice
     [ try sysDec
     , try contDec
     , try dtypeDec
@@ -107,11 +98,9 @@ declaration = space >> choice
 sysDec :: Parser Declaration
 sysDec = do
     getByType SYSTEM <?> "system"
-    name  <- dbg "system name" (getIdentifier <?> "system name")
-    par   <- dbg "system parent" parent
-    block <- dbg "system block" blockStmt
-    return $ System name par block
-
+    name <- getIdentifier <?> "system name"
+    par  <- parent
+    System name par <$> blockStmt
 
 contDec :: Parser Declaration
 contDec = do
@@ -127,13 +116,8 @@ dtypeDec = do
     par  <- parent
     Datatype name par <$> blockStmt
 
-parent :: Parser (Maybe Text)
-parent =
-    dbg "parent"
-        $  optional
-        $  try
-        $  getByType LESS
-        >> (getIdentifier <|> failure Nothing (formList))
+parent :: Parser (Maybe Expression)
+parent = optional $ try (getByType LESS >> getIdentifier)
 
 
 varDec :: Parser Declaration
@@ -186,7 +170,8 @@ safety :: Parser PPDirective
 safety = do
     getByType SAFETY
     level <- choice [content "1", content "2", content "3"]
-    return $ Safety (txt level)
+    let intL = read (T.unpack (txt level))
+    return $ Safety intL
 
 
 blockStmt :: Parser Block
@@ -340,16 +325,14 @@ callExpr = do
         Just x  -> CallExpr (base : idfs) <$> getArgs
 
 baseExpr :: Parser Expression
-baseExpr = do
-    tok <- choice
-        [ getByType NUM
-        , getByType STRING
-        , getByType TRUE
-        , getByType FALSE
-        , getByType NULL
-        , getByType IDF
-        ]
-    return $ BaseExpr tok
+baseExpr = choice
+    [ NumExpr . read . T.unpack . txt <$> getByType NUM
+    , StringExpr <$> (txt <$> getByType STRING)
+    , BaseExpr . typ <$> getByType TRUE
+    , BaseExpr . typ <$> getByType FALSE
+    , BaseExpr . typ <$> getByType NULL
+    , IdfExpr . txt <$> getByType IDF
+    ]
 
 
 groupingExpr :: Parser Expression
@@ -375,18 +358,15 @@ parameters = do
 
 var :: Parser (Expression, Expression)
 var = do
-
     typ  <- getIdentifier
-
     name <- getIdentifier
-
     return (typ, name)
 
 
-getIdentifier :: Parser Text
+getIdentifier :: Parser Expression
 getIdentifier = do
     idf <- getByType IDF
-    return $ txt idf
+    return $ IdfExpr (txt idf)
 
 --getString :: Parser Text
 --getString = do

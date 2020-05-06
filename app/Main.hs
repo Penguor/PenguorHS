@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import           System.Environment
@@ -5,6 +7,7 @@ import           Build
 import           System.IO
 import qualified Data.Text                     as T
                                                 ( pack )
+import           Parser                         ( program )
 
 main :: IO ()
 main = do
@@ -15,7 +18,7 @@ main = do
         else case head args of
             "--build" -> do
                 file <- readFile (args !! 1)
-                buildFromSource (T.pack file)
+                buildFromSource (program) (T.pack file)
             xs ->
                 putStrLn
                     ("Invalid option \"" ++ xs ++ "\" \n use --help for help")
