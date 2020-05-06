@@ -81,7 +81,7 @@ data Expression =
 --    deriving(Show, Eq)
 
 program :: Parser Program
-program = Program <$> some declaration
+program = Program <$> some declaration <* getByType EOF
 
 declaration :: Parser Declaration
 declaration = choice

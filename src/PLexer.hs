@@ -10,6 +10,7 @@ where
 import           Data.Void
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
+import qualified Data.List                     as DL
 
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
@@ -34,7 +35,13 @@ symbol = L.symbol skipSpace
 
 
 tokenize :: Parser [Tok]
-tokenize = many getToken <* eof
+tokenize = do
+    toks <- many getToken
+    pos1 <- eof *> getSourcePos
+    return (toks ++ getEof pos1)
+  where
+    getEof a = [Tok EOF (TokenPos a a 0) ""]
+    sp = initialPos ""
 
 getToken :: Parser Tok
 getToken =
@@ -91,9 +98,10 @@ buildNum = do
 buildString :: Parser Tok
 buildString = do
     pos1 <- getSourcePos
-    str  <- between (symbol "\"") (symbol "\"") (many anySingle)
+    str  <- between (space >> single '"' <* space) (symbol "\"") (many text)
     pos2 <- getSourcePos
     return $ Tok STRING (TokenPos pos1 pos2 (length str)) (T.pack str)
+    where text = satisfy (/= '"')
 
 getOther :: Parser Tok
 getOther = choice
