@@ -1,12 +1,12 @@
-!#
- # library:test
- # safety:2
- #!
+#safety 2
 
-system Welcome
+library LibHello
 {
-    fn execute() string
+    system Welcome
     {
-        print("Welcome");
+        fn execute() string
+        {
+            print("Welcome");
+        }
     }
 }

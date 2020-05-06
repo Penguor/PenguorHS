@@ -23,13 +23,26 @@ import           PLexer
 
 type Parser = Parsec Void PStream
 
+skipSpace :: Parser ()
+skipSpace =
+    L.space space1 (L.skipLineComment "//") (L.skipBlockCommentNested "/*" "*/")
+
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme skipSpace
+
+symbol :: Tokens Text -> Parser Text
+symbol = L.symbol skipSpace
+
+newtype Program = Program [Declaration]
+    deriving(Show, Eq)
+
 data Declaration =
-      System Text (Maybe Text) Block
-    | Container Text (Maybe Text) Block
-    | Datatype Text (Maybe Text) Block
-    | Var Text Text
-    | Function Text Text [(Text, Text)] Block
-    | Library Text Block
+      System Expression (Maybe Expression) Block
+    | Container Expression (Maybe Expression) Block
+    | Datatype Expression (Maybe Expression) Block
+    | Var Expression Expression
+    | Function Expression Expression [(Expression, Expression)] Block
+    | Library Expression Block
     | Stmt Statement
     deriving(Show, Eq)
 
@@ -38,17 +51,17 @@ data Statement =
     | BlockStmt Block
     | IfStmt Expression [Statement] [Elif] [Statement]
     | WhileStmt Expression [Statement]
-    | ForStmt (Text, Text) Expression [Statement]
+    | ForStmt Expression Expression [Statement]
     | DoStmt [Statement] Expression
-    | SwitchStmt Text [Statement] (Maybe [Statement])
+    | SwitchStmt Expression [Statement] [Statement]
     | CaseStmt Expression [Statement]
     | ExprStmt Expression
     deriving(Show, Eq)
 
 data PPDirective =
-      Include Text
-    | FromIncl Text Text
-    | Safety Text
+      Include Expression
+    | FromIncl Expression Expression
+    | Safety Integer
     deriving(Show, Eq)
 
 data Block = Block [Declaration] | EmptyBlock
@@ -61,22 +74,26 @@ data Expression =
       AssignExpr Expression Expression
     | BinaryExpr Expression TType Expression
     | BooleanExpr Bool
-    | CallExpr [Text] [Expression]
+    | CallExpr [Call]
     | GroupingExpr Expression
-    | IdentifierExpr Text
+    | IdfExpr Text
     | NullExpr
     | NumExpr Double
     | StringExpr Text
-    | UnaryExpr TType Expression
-    | BaseExpr Tok
+    | UnaryExpr TokenType.TokenType Expression
+    | BaseExpr TokenType.TokenType
     deriving(Show, Eq)
 
+data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
 
-program :: Parser [Declaration]
-program = some declaration
+
+    deriving(Show, Eq)
+
+program :: Parser Program
+program = Program <$> some declaration <* space <* eof
 
 declaration :: Parser Declaration
-declaration = choice
+declaration = space >> choice
     [ try sysDec
     , try contDec
     , try dtypeDec
@@ -163,6 +180,7 @@ fromIncl = do
     lib <- getIdentifier
     getByType INCLUDE
     FromIncl lib <$> getIdentifier
+
 
 safety :: Parser PPDirective
 safety = do
@@ -347,7 +365,7 @@ getArgs = do
     where idfs = many $ getByType COMMA >> expression
 
 
-parameters :: Parser [(Text, Text)]
+parameters :: Parser [(Expression, Expression)]
 parameters = do
     par   <- var
     comma <- optional $ getByType COMMA
@@ -355,7 +373,7 @@ parameters = do
         Nothing -> return [par]
         Just x  -> parameters
 
-var :: Parser (Text, Text)
+var :: Parser (Expression, Expression)
 var = do
 
     typ  <- getIdentifier
