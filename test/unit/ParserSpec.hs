@@ -6,6 +6,7 @@ import           Test.Hspec
 import           Test.Hspec.Megaparsec
 import           Text.Megaparsec
 import           Data.Text
+import           Data.Void                      ( Void )
 
 import qualified Parser                        as P
 import           Parser.Token
@@ -13,11 +14,17 @@ import           PLexer                         ( tokenize )
 
 -- parse :: P.Parser a -> Text -> (Either )
 parseT p i = do
-
     either (fail "failed on lexing") (parse p "") (stream <$> toks)
   where
     toks = parse tokenize "" i
     stream a = PStream { streamInput = i, streamTokens = a }
+
+-- parseF :: (Text -> P.Parser a) -> Text -> Either (ParseErrorBundle Text Void)
+-- parseF p i = do
+--     toks <- parse tokenize "" i
+--     case toks of
+--         Left err -> fail <$> errorBundlePretty err
+--         Right res -> p `shouldFailOn` res
 
 spec = describe "program" $ do
     let program = parseT P.program
@@ -163,7 +170,7 @@ spec = describe "program" $ do
                         -- context "when provided with invalid input"
                         --     $ it "fails when provided with digits > 2"
                         --     $ do
-                                --  safety `shouldFailOn` "safety 3"
+                                 --  parseF safety "safety 3"
                                 --  safety `shouldFailOn` "safety 4"
                                 --  safety `shouldFailOn` "safety 5"
                                 --  safety `shouldFailOn` "safety 6"

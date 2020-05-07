@@ -12,11 +12,11 @@ import           Parser
 import           PLexer                         ( tokenize )
 import           Parser.Token                   ( PStream(..) )
 
-buildFromSource :: (Show a) => Parser a -> Text -> IO ()
-buildFromSource p input = do
+buildFromSource :: Text -> IO ()
+buildFromSource input = do
     parseTest tokenize input
     putStr "\n"
-    either (putStrLn <$> errorBundlePretty) (parseTest p) (stream <$> toks)
+    either (putStrLn <$> errorBundlePretty) (parseTest program) (stream <$> toks)
   where
     toks = parse tokenize "" input
     stream a = PStream { streamInput = input, streamTokens = a }
