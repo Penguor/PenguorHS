@@ -7,10 +7,10 @@ library ShowPenguor
 {
     system HelloWorld < Parent
     {
-        fn void execute()
+        fn void execute(string t)
         {
-            /*var string a;
-            //a = "Hello " + name;
+            var string a;
+            /*a = "Hello " + name;
             if(true || false) 
             {
                 print.print;
@@ -24,8 +24,8 @@ library ShowPenguor
         var string n2; 
         var string n3; 
 
-        /*n1 = "Peter";
-        n2 = "Frank";
-        n3 = "Anna";*/
+        //n1 = a;
+        //n2 = "Frank";
+        //n3 = "Anna";
     }
 }

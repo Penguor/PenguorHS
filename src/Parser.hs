@@ -44,7 +44,7 @@ data Statement =
     | BlockStmt Block
     | IfStmt Expression [Statement] [Elif] [Statement]
     | WhileStmt Expression [Statement]
-    | ForStmt (Expression, Expression) Expression [Statement]
+    | ForStmt Expression Expression [Statement]
     | DoStmt [Statement] Expression
     | SwitchStmt Expression [Statement] (Maybe [Statement])
     | CaseStmt Expression [Statement]
@@ -67,7 +67,7 @@ data Expression =
       AssignExpr Expression Expression
     | BinaryExpr Expression TType Expression
     | BooleanExpr Bool
-    | CallExpr [Expression] [Expression]
+    | CallExpr [Call]
     | GroupingExpr Expression
     | IdfExpr Text
     | NullExpr
@@ -77,11 +77,11 @@ data Expression =
     | BaseExpr TType
     deriving(Show, Eq)
 
--- data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
---    deriving(Show, Eq)
+data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
+    deriving(Show, Eq)
 
 program :: Parser Program
-program = Program <$> some declaration <* getByType EOF
+program = Program <$> some declaration <* (getByType EOF <?> "end of file")
 
 declaration :: Parser Declaration
 declaration = choice
@@ -97,7 +97,7 @@ declaration = choice
 
 sysDec :: Parser Declaration
 sysDec = do
-    dbg "sysDec" (getByType SYSTEM <?> "system")
+    getByType SYSTEM <?> "system"
     name <- getIdentifier <?> "system name"
     par  <- parent
     System name par <$> blockStmt
@@ -123,8 +123,7 @@ parent = optional $ try (getByType LESS >> getIdentifier)
 varDec :: Parser Declaration
 varDec = do
     getByType VAR
-    typ  <- getIdentifier
-    name <- getIdentifier <* getByType SEMICOLON
+    (typ, name) <- var <* getByType SEMICOLON
     return $ Var typ name
 
 functionDec :: Parser Declaration
@@ -160,7 +159,8 @@ preProcessorStmt :: Parser Statement
 preProcessorStmt = getByType HASHTAG >> PPStmt <$> ppDirective
 
 ppDirective :: Parser PPDirective
-ppDirective = try include <|> try fromIncl <|> try safety
+ppDirective =
+    try include <|> try fromIncl <|> try safety <?> "preprocessor directive"
 
 include :: Parser PPDirective
 include = getByType INCLUDE >> Include <$> getIdentifier
@@ -176,15 +176,14 @@ fromIncl = do
 safety :: Parser PPDirective
 safety = do
     getByType SAFETY
-    level <- choice [content "1", content "2", content "3"]
+    level <- choice [content "0", content "1", content "2"]
     let intL = read (T.unpack (txt level))
     return $ Safety intL
 
 
 blockStmt :: Parser Block
-blockStmt = dbg "block" $ Block <$> between (getByType LBRACE)
-                                            (getByType RBRACE)
-                                            (many declaration)
+blockStmt =
+    Block <$> between (getByType LBRACE) (getByType RBRACE) (many declaration)
 
 ifStmt :: Parser Statement
 ifStmt = do
@@ -216,7 +215,7 @@ whileStmt = do
 forStmt :: Parser Statement
 forStmt = do
     getByType FOR >> getByType LPAREN
-    element <- var <* getByType COLON
+    element <- getIdentifier <* getByType COLON
     list    <- expression <* getByType RPAREN
     code    <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     return $ ForStmt element list code
@@ -227,6 +226,7 @@ doStmt = do
     code <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     getByType WHILE
     condition <- between (getByType LPAREN) (getByType RPAREN) expression
+    getByType SEMICOLON
     return $ DoStmt code condition
 
 switchStmt :: Parser Statement
@@ -235,7 +235,12 @@ switchStmt = do
     idf <- between (getByType LPAREN) (getByType RPAREN) getIdentifier
     getByType LBRACE
     cases <- some caseStmt
-    def   <- optional (getByType DEFAULT >> getByType COLON >> some statement)
+    def   <- optional
+        (  getByType DEFAULT
+        >> getByType COLON
+        >> some statement
+        <* getByType RBRACE
+        )
     return $ SwitchStmt idf cases def
 
 
@@ -244,7 +249,11 @@ caseStmt = do
     getByType CASE
     expr <-
         getByType LPAREN >> expression <* getByType RPAREN <* getByType COLON
-    code <- many statement
+    code <- manyTill
+        statement
+        (choice
+            [try $ getByType CASE, try $ getByType DEFAULT, getByType RBRACE]
+        )
     return $ CaseStmt expr code
 
 exprStmt :: Parser Statement
@@ -252,21 +261,22 @@ exprStmt = ExprStmt <$> (expression <* getByType SEMICOLON)
 
 
 expression :: Parser Expression
-expression = try assignExpr
+expression = assignExpr
 
 assignExpr :: Parser Expression
 assignExpr = do
-    expr <- try orExpr <|> try callExpr
-    case expr of
-        CallExpr _ _ -> AssignExpr expr <$> (getByType ASSIGN *> assignExpr)
-        _            -> return expr
+    expr <- orExpr
+    op   <- optional (getByType ASSIGN)
+    case op of
+        Just _  -> AssignExpr expr <$> orExpr
+        Nothing -> return expr
 
 orExpr :: Parser Expression
 orExpr = do
     lhs <- andExpr
     op  <- optional (getByType OR)
     case op of
-        Just _  -> BinaryExpr lhs OR <$> andExpr
+        Just _  -> BinaryExpr lhs OR <$> orExpr
         Nothing -> return lhs
 
 andExpr :: Parser Expression
@@ -274,7 +284,7 @@ andExpr = do
     lhs <- equalityExpr
     op  <- optional (getByType AND)
     case op of
-        Just _  -> BinaryExpr lhs OR <$> equalityExpr
+        Just _  -> BinaryExpr lhs OR <$> andExpr
         Nothing -> return lhs
 
 equalityExpr :: Parser Expression
@@ -282,7 +292,7 @@ equalityExpr = do
     lhs <- relationExpr
     op  <- optional (try (getByType EQUALS) <|> try (getByType NEQUALS))
     case op of
-        Just x  -> BinaryExpr lhs (typ x) <$> relationExpr
+        Just x  -> BinaryExpr lhs (typ x) <$> equalityExpr
         Nothing -> return lhs
 
 relationExpr :: Parser Expression
@@ -295,7 +305,7 @@ relationExpr = do
         <|> try (getByType GREATER)
         )
     case op of
-        Just x  -> BinaryExpr lhs (typ x) <$> additionExpr
+        Just x  -> BinaryExpr lhs (typ x) <$> relationExpr
         Nothing -> return lhs
 
 additionExpr :: Parser Expression
@@ -303,7 +313,7 @@ additionExpr = do
     lhs <- multiplicationExpr
     op  <- optional (try (getByType PLUS) <|> try (getByType MINUS))
     case op of
-        Just x  -> BinaryExpr lhs (typ x) <$> multiplicationExpr
+        Just x  -> BinaryExpr lhs (typ x) <$> additionExpr
         Nothing -> return lhs
 
 multiplicationExpr :: Parser Expression
@@ -311,7 +321,7 @@ multiplicationExpr = do
     lhs <- unaryExpr
     op  <- optional (try (getByType MUL) <|> try (getByType DIV))
     case op of
-        Just x  -> BinaryExpr lhs (typ x) <$> unaryExpr
+        Just x  -> BinaryExpr lhs (typ x) <$> multiplicationExpr
         Nothing -> return lhs
 
 unaryExpr :: Parser Expression
@@ -323,18 +333,29 @@ unaryExpr = do
 
 
 callExpr :: Parser Expression
-callExpr = do
-    base <- getIdentifier
-    idfs <- many $ getByType DOT >> getIdentifier
-    temp <- optional $ getByType LPAREN
-    case temp of
-        Nothing -> return $ CallExpr (base : idfs) []
-        Just x  -> CallExpr (base : idfs) <$> getArgs
+callExpr = CallExpr <$> getCall
+
+getCall :: Parser [Call]
+getCall = do
+    base <- baseExpr
+    case base of
+        IdfExpr _ -> do
+            next <- option OTHER $ try (getType LPAREN <|> getType DOT)
+            case next of
+                DOT -> do
+                    rest <- getCall
+                    return (BaseCall base : rest)
+                LPAREN -> do
+                    args <- getArgs <* getByType RPAREN
+                    rest <- getCall
+                    return (FnCall base args : rest)
+                _ -> return [BaseCall base]
+        _ -> return [BaseCall base]
 
 baseExpr :: Parser Expression
 baseExpr = choice
     [ NumExpr . read . T.unpack . txt <$> getByType NUM
-    , StringExpr <$> (txt <$> getByType STRING)
+    , StringExpr . txt <$> getByType STRING
     , BaseExpr . typ <$> getByType TRUE
     , BaseExpr . typ <$> getByType FALSE
     , BaseExpr . typ <$> getByType NULL
@@ -361,7 +382,9 @@ parameters = do
     comma <- optional $ getByType COMMA
     case comma of
         Nothing -> return [par]
-        Just x  -> parameters
+        Just x  -> do
+            rest <- parameters <?> "parameters"
+            return (par : rest)
 
 var :: Parser (Expression, Expression)
 var = do

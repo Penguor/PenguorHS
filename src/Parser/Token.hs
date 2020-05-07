@@ -8,6 +8,7 @@ module Parser.Token
     ( Tok(..)
     , TType(..)
     , getByType
+    , getType
     , content
     , PStream(..)
     , TokenPos(..)
@@ -134,6 +135,11 @@ getByType :: TType -> Parser Tok
 getByType t = do
     tk <- anySingle
     if t == typ tk then return tk else fail $ "expecting " ++ show t
+
+getType :: TType -> Parser TType
+getType t = do
+    tk <- anySingle
+    if t == typ tk then return (typ tk) else fail $ "expecting " ++ show t
 
 content :: Text -> Parser Tok
 content a = do

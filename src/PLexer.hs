@@ -126,8 +126,8 @@ getOther = choice
     , tokBySymbol "&&" AND            ""
     , tokBySymbol "||" OR             ""
     , tokBySymbol "#"  HASHTAG        ""
-    , tokBySymbol "==" RBRACK         ""
-    , tokBySymbol "="  RBRACK         ""
+    , tokBySymbol "==" EQUALS         ""
+    , tokBySymbol "="  ASSIGN         ""
     ]
 
 
