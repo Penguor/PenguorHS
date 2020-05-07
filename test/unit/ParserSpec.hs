@@ -12,20 +12,34 @@ import qualified Parser                        as P
 import           Parser.Token
 import           PLexer                         ( tokenize )
 
--- parse :: P.Parser a -> Text -> (Either )
+parseT
+    :: (Show a)
+    => P.Parser a
+    -> Text
+    -> Either (ParseErrorBundle PStream Void) a
 parseT p i = do
-    either (fail "failed on lexing") (parse p "") (stream <$> toks)
-  where
-    toks = parse tokenize "" i
-    stream a = PStream { streamInput = i, streamTokens = a }
+    let toks = parse tokenize "" i
+    case toks of
+        Left  err -> fail "failed on lexing"
+        Right res -> parse p "" (stream res)
+    where stream = PStream i
 
--- parseF :: (Text -> P.Parser a) -> Text -> Either (ParseErrorBundle Text Void)
--- parseF p i = do
---     toks <- parse tokenize "" i
---     case toks of
---         Left err -> fail <$> errorBundlePretty err
---         Right res -> p `shouldFailOn` res
+parseF
+    :: (Show a)
+    => P.Parser a
+    -> PStream
+    -> Either (ParseErrorBundle PStream Void) a
+parseF p i = parse p "" i
 
+getStream :: Text -> PStream
+getStream i = do
+    let toks = parse tokenize "" i
+    case toks of
+        Left  err -> error "failed on lexing"
+        Right res -> PStream i res
+
+
+spec :: SpecWith ()
 spec = describe "program" $ do
     let program = parseT P.program
     it "can parse multiple declarations"
@@ -93,37 +107,49 @@ spec = describe "program" $ do
                 `shouldParse` P.Function
                                   (P.IdfExpr "void")
                                   (P.IdfExpr "transform")
-                                  [ ((P.IdfExpr "int"), (P.IdfExpr "x"))
-                                  , ((P.IdfExpr "int"), (P.IdfExpr "y"))
-                                  , ((P.IdfExpr "int"), (P.IdfExpr "z"))
+                                  [ (P.IdfExpr "int", P.IdfExpr "x")
+                                  , (P.IdfExpr "int", P.IdfExpr "y")
+                                  , (P.IdfExpr "int", P.IdfExpr "z")
                                   ]
                                   (P.Block [])
             describe "parameters" $ do
                 let parameters = parseT P.parameters
                 it "can parse one parameter"
                     $             parameters "string a"
-                    `shouldParse` [((P.IdfExpr "string"), (P.IdfExpr "a"))]
+                    `shouldParse` [(P.IdfExpr "string", P.IdfExpr "a")]
                 it "can parse multiple parameters"
                     $             parameters "string a, int b, bool cd"
-                    `shouldParse` [ ((P.IdfExpr "string"), (P.IdfExpr "a"))
-                                  , ((P.IdfExpr "int")   , (P.IdfExpr "b"))
-                                  , ((P.IdfExpr "bool")  , (P.IdfExpr "cd"))
+                    `shouldParse` [ (P.IdfExpr "string", P.IdfExpr "a")
+                                  , (P.IdfExpr "int"   , P.IdfExpr "b")
+                                  , (P.IdfExpr "bool"  , P.IdfExpr "cd")
                                   ]
-                -- context "when provided with invalid input" $ do
-                --     it "fails on trailing commas"
-                --         $              parameters
-                --         `shouldFailOn` "bool correct,"
-                --     it "fails when parameter name is missing"
-                --         $              parameters
-                --         `shouldFailOn` "bool correct, string"
-                --     it "fails when name or type is missing"
-                --         $              parameters
-                --         `shouldFailOn` "bool, string test"
+                context "when provided with invalid input" $ do
+                    it "fails on trailing commas"
+                        $              parseF P.parameters
+                        `shouldFailOn` getStream "bool correct,"
+                    it "fails when parameter name is missing"
+                        $              parseF P.parameters
+                        `shouldFailOn` getStream "bool correct, string"
+                    it "fails when name or type is missing"
+                        $              parseF P.parameters
+                        `shouldFailOn` getStream "bool, string test"
+
+
+
+
+
+
+
+
+
+
+
+
             describe "var" $ do
                 let var = parseT P.var
                 it "parses a single parameter"
                     $             var "string a"
-                    `shouldParse` ((P.IdfExpr "string"), (P.IdfExpr "a"))
+                    `shouldParse` (P.IdfExpr "string", P.IdfExpr "a")
         it "can execute the library parser"
             $             declaration "library Test {}"
             `shouldParse` P.Library (P.IdfExpr "Test") (P.Block [])
@@ -167,16 +193,26 @@ spec = describe "program" $ do
                         it "can parse safety levels"
                             $             safety "safety 1"
                             `shouldParse` P.Safety 1
-                        -- context "when provided with invalid input"
-                        --     $ it "fails when provided with digits > 2"
-                        --     $ do
-                                 --  parseF safety "safety 3"
-                                --  safety `shouldFailOn` "safety 4"
-                                --  safety `shouldFailOn` "safety 5"
-                                --  safety `shouldFailOn` "safety 6"
-                                --  safety `shouldFailOn` "safety 7"
-                                --  safety `shouldFailOn` "safety 8"
-                                --  safety `shouldFailOn` "safety 9"
+                        context "when provided with invalid input"
+                            $ it "fails when provided with digits > 2"
+                            $ do
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 3"
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 4"
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 5"
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 6"
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 7"
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 8"
+                                  parseF P.safety
+                                      `shouldFailOn` getStream "safety 9"
+
+
+
             it "can execute the if statement parser"
                 $             statement "if(true) {i=1;}"
                 `shouldParse` P.IfStmt
@@ -184,7 +220,7 @@ spec = describe "program" $ do
                                   [ P.ExprStmt
                                         (P.AssignExpr
                                             (P.CallExpr
-                                                [P.BaseCall ((P.IdfExpr "i"))]
+                                                [P.BaseCall (P.IdfExpr "i")]
                                             )
                                             (P.CallExpr
                                                 [P.BaseCall (P.NumExpr 1)]
@@ -279,6 +315,20 @@ spec = describe "program" $ do
 \        a = a + 1; \
 \    default: \
 \        a = 2; \
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 \}"
                 `shouldParse` P.SwitchStmt
                                   (P.IdfExpr "test")
@@ -354,6 +404,20 @@ spec = describe "program" $ do
                                       )
                 it "can parse and expressions"
                     $             expression "true && isEntity;" -- ! inspect why some expressions need a semicolon to parse
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                     `shouldParse` P.BinaryExpr
                                       (P.CallExpr [P.BaseCall (P.BaseExpr TRUE)]

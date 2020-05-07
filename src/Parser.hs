@@ -72,6 +72,7 @@ data Expression =
     deriving(Show, Eq)
 
 data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
+
     deriving(Show, Eq)
 
 program :: Parser Program
@@ -153,7 +154,8 @@ preProcessorStmt :: Parser Statement
 preProcessorStmt = getByType HASHTAG >> PPStmt <$> ppDirective
 
 ppDirective :: Parser PPDirective
-ppDirective = choice [try include, try fromIncl, safety] <?> "preprocessor directive"
+ppDirective =
+    choice [try include, try fromIncl, safety] <?> "preprocessor directive"
 
 include :: Parser PPDirective
 include = getByType INCLUDE >> Include <$> getIdentifier
@@ -171,7 +173,9 @@ safety = do
     getByType SAFETY
     level <- getByType NUM
     let intL = read (T.unpack (txt level))
-    return $ Safety intL
+    if intL > 2 || intL < 0
+        then fail "expecting a number between 0 and 2"
+        else return $ Safety intL
 
 
 blockStmt :: Parser Block
@@ -230,12 +234,12 @@ switchStmt = do
     cases <- some caseStmt
     def   <- optional $ try (getByType DEFAULT)
     case def of
-        Just _ -> do 
+        Just _ -> do
             getByType COLON
             stmts <- some statement
             getByType RBRACE
             return $ SwitchStmt idf cases (Just stmts)
-        Nothing -> do 
+        Nothing -> do
             getByType RBRACE
             return $ SwitchStmt idf cases Nothing
 
@@ -361,6 +365,7 @@ groupingExpr = between (getByType LPAREN) (getByType RPAREN) expression
 getArgs :: Parser [Expression]
 getArgs = do
     base <- option NullExpr expression -- ! seems to be incorrect
+
     case base of
         NullExpr -> return []
         _        -> idfs
@@ -393,4 +398,5 @@ getIdentifier = do
 --getString = do
 --    T.pack <$> between (getByType TType) (char '"') (many (text))
 --    where text = satisfy (/= '"')
+
 
