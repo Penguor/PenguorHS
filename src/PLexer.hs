@@ -37,7 +37,9 @@ symbol = L.symbol skipSpace
 tokenize :: Parser [Tok]
 tokenize = do
     toks <- many getToken
+    skipSpace
     pos1 <- eof *> getSourcePos
+    skipSpace
     return (toks ++ getEof pos1)
   where
     getEof a = [Tok EOF (TokenPos a a 0) ""]
@@ -63,11 +65,13 @@ buildIdf = choice
     , tokBySymbol "do"        DO        ""
     , tokBySymbol "from"      FROM      ""
     , tokBySymbol "include"   INCLUDE   ""
+    , tokBySymbol "safety"    SAFETY    ""
     , tokBySymbol "var"       VAR       ""
     , tokBySymbol "true"      TRUE      ""
     , tokBySymbol "false"     FALSE     ""
     , tokBySymbol "switch"    SWITCH    ""
     , tokBySymbol "case"      CASE      ""
+    , tokBySymbol "default"   DEFAULT   ""
     , getIdf
     ]
 
@@ -109,6 +113,7 @@ getOther = choice
     , tokBySymbol "-"  MINUS          ""
     , tokBySymbol "*"  MUL            ""
     , tokBySymbol "/"  DIV            ""
+    , tokBySymbol "!"  EXCL_MARK      ""
     , tokBySymbol "("  LPAREN         ""
     , tokBySymbol ")"  RPAREN         ""
     , tokBySymbol "{"  LBRACE         ""

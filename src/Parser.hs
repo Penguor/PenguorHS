@@ -11,13 +11,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Text.Read
 
-import           Text.Megaparsec         hiding ( single
-                                                , parse
-                                                )
-import qualified Text.Megaparsec               as MP
-                                                ( single
-                                                , parse
-                                                )
+import           Text.Megaparsec
 import           Text.Megaparsec.Debug
 
 import           Parser.Token
@@ -159,8 +153,7 @@ preProcessorStmt :: Parser Statement
 preProcessorStmt = getByType HASHTAG >> PPStmt <$> ppDirective
 
 ppDirective :: Parser PPDirective
-ppDirective =
-    try include <|> try fromIncl <|> try safety <?> "preprocessor directive"
+ppDirective = choice [try include, try fromIncl, safety] <?> "preprocessor directive"
 
 include :: Parser PPDirective
 include = getByType INCLUDE >> Include <$> getIdentifier
@@ -176,7 +169,7 @@ fromIncl = do
 safety :: Parser PPDirective
 safety = do
     getByType SAFETY
-    level <- choice [content "0", content "1", content "2"]
+    level <- getByType NUM
     let intL = read (T.unpack (txt level))
     return $ Safety intL
 
@@ -191,7 +184,7 @@ ifStmt = do
     condition  <- between (getByType LPAREN) (getByType RPAREN) expression
     code       <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     elifBlocks <- many elif
-    els        <- optional $ getByType ELSE
+    els        <- optional (try (getByType ELSE))
     case els of
         Nothing -> return $ IfStmt condition code elifBlocks []
         Just x  -> IfStmt condition code elifBlocks <$> some statement
@@ -199,7 +192,7 @@ ifStmt = do
 
 elif :: Parser Elif
 elif = do
-    getByType ELIF
+    try $ getByType ELIF
     condition <- between (getByType LPAREN) (getByType RPAREN) expression
     code      <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     return $ Elif condition code
@@ -235,25 +228,23 @@ switchStmt = do
     idf <- between (getByType LPAREN) (getByType RPAREN) getIdentifier
     getByType LBRACE
     cases <- some caseStmt
-    def   <- optional
-        (  getByType DEFAULT
-        >> getByType COLON
-        >> some statement
-        <* getByType RBRACE
-        )
-    return $ SwitchStmt idf cases def
+    def   <- optional $ try (getByType DEFAULT)
+    case def of
+        Just _ -> do 
+            getByType COLON
+            stmts <- some statement
+            getByType RBRACE
+            return $ SwitchStmt idf cases (Just stmts)
+        Nothing -> do 
+            getByType RBRACE
+            return $ SwitchStmt idf cases Nothing
 
 
 caseStmt :: Parser Statement
 caseStmt = do
-    getByType CASE
-    expr <-
-        getByType LPAREN >> expression <* getByType RPAREN <* getByType COLON
-    code <- manyTill
-        statement
-        (choice
-            [try $ getByType CASE, try $ getByType DEFAULT, getByType RBRACE]
-        )
+    try $ getByType CASE
+    expr <- expression <* getByType COLON
+    code <- many $ try statement
     return $ CaseStmt expr code
 
 exprStmt :: Parser Statement
@@ -266,7 +257,7 @@ expression = assignExpr
 assignExpr :: Parser Expression
 assignExpr = do
     expr <- orExpr
-    op   <- optional (getByType ASSIGN)
+    op   <- optional $ try (getByType ASSIGN)
     case op of
         Just _  -> AssignExpr expr <$> orExpr
         Nothing -> return expr
@@ -274,7 +265,7 @@ assignExpr = do
 orExpr :: Parser Expression
 orExpr = do
     lhs <- andExpr
-    op  <- optional (getByType OR)
+    op  <- optional $ try (getByType OR)
     case op of
         Just _  -> BinaryExpr lhs OR <$> orExpr
         Nothing -> return lhs
@@ -282,9 +273,9 @@ orExpr = do
 andExpr :: Parser Expression
 andExpr = do
     lhs <- equalityExpr
-    op  <- optional (getByType AND)
+    op  <- optional $ try (getByType AND)
     case op of
-        Just _  -> BinaryExpr lhs OR <$> andExpr
+        Just _  -> BinaryExpr lhs AND <$> andExpr
         Nothing -> return lhs
 
 equalityExpr :: Parser Expression
@@ -340,25 +331,25 @@ getCall = do
     base <- baseExpr
     case base of
         IdfExpr _ -> do
-            next <- option OTHER $ try (getType LPAREN <|> getType DOT)
+            next <- optional $ try (getType LPAREN <|> getType DOT)
             case next of
-                DOT -> do
+                Just DOT -> do
                     rest <- getCall
                     return (BaseCall base : rest)
-                LPAREN -> do
+                Just LPAREN -> do
                     args <- getArgs <* getByType RPAREN
                     rest <- getCall
                     return (FnCall base args : rest)
-                _ -> return [BaseCall base]
+                Nothing -> return [BaseCall base]
         _ -> return [BaseCall base]
 
 baseExpr :: Parser Expression
 baseExpr = choice
-    [ NumExpr . read . T.unpack . txt <$> getByType NUM
-    , StringExpr . txt <$> getByType STRING
-    , BaseExpr . typ <$> getByType TRUE
-    , BaseExpr . typ <$> getByType FALSE
-    , BaseExpr . typ <$> getByType NULL
+    [ try $ NumExpr . read . T.unpack . txt <$> getByType NUM
+    , try $ StringExpr . txt <$> getByType STRING
+    , try $ BaseExpr . typ <$> getByType TRUE
+    , try $ BaseExpr . typ <$> getByType FALSE
+    , try $ BaseExpr . typ <$> getByType NULL
     , IdfExpr . txt <$> getByType IDF
     ]
 
@@ -369,7 +360,7 @@ groupingExpr = between (getByType LPAREN) (getByType RPAREN) expression
 
 getArgs :: Parser [Expression]
 getArgs = do
-    base <- option NullExpr expression
+    base <- option NullExpr expression -- ! seems to be incorrect
     case base of
         NullExpr -> return []
         _        -> idfs
@@ -379,7 +370,7 @@ getArgs = do
 parameters :: Parser [(Expression, Expression)]
 parameters = do
     par   <- var
-    comma <- optional $ getByType COMMA
+    comma <- optional $ try (getByType COMMA)
     case comma of
         Nothing -> return [par]
         Just x  -> do

@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE LambdaCase        #-}
+
 
 module Parser.Token
     ( Tok(..)
@@ -31,9 +31,9 @@ type Parser = Parsec Void PStream
 
 data TType = HASHTAG
     | FROM | INCLUDE | SAFETY
-    | LPAREN | RPAREN
-    | LBRACE | RBRACE
-    | LBRACK | RBRACK
+    | LPAREN | RPAREN -- ()
+    | LBRACE | RBRACE -- {}
+    | LBRACK | RBRACK -- []
     | PLUS | MINUS | MUL | DIV
     | GREATER | LESS
     | GREATER_EQUALS | LESS_EQUALS
@@ -71,6 +71,7 @@ instance Show Tok where
 data PStream = PStream { streamInput :: Text, streamTokens :: [Tok]}
 
 -- ! implement better version, currently just copied from https://markkarpov.com/tutorial/megaparsec.html
+
 
 instance Stream PStream where
     type Token PStream = Tok
