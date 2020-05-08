@@ -65,8 +65,8 @@ data TokenPos = TokenPos {startPos :: SourcePos, endPos :: SourcePos, tokLength 
 
 instance Show Tok where
     show a = "(Token type: " ++ show (typ a) ++ if T.unpack (txt a) == ""
-        then ")"
-        else ", value: " ++ T.unpack (txt a) ++ ")"
+        then ")\n"
+        else ", value: " ++ T.unpack (txt a) ++ ")\n"
 
 data PStream = PStream { streamInput :: Text, streamTokens :: [Tok]}
 
