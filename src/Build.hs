@@ -8,7 +8,6 @@ import           Text.Megaparsec
 import           Parser                         ( program )
 import           PLexer                         ( tokenize )
 import           Parser.Token                   ( PStream(..) )
-import           Control.Monad                  ( when )
 import           Data.Time.Clock.System
 import           Data.Time.Clock
 
@@ -33,11 +32,11 @@ lexOnly input file out = do
             et <- getSystemTime
             putStrLn "Input:"
             putStrLn $ "    File: " ++ file
-            putStrLn $ "    Characters: " ++ (show (T.length input))
-            putStrLn $ "    Lines: " ++ (show (length (T.lines input)))
-            putStrLn $ "Output: "
+            putStrLn $ "    Characters: " ++ show (T.length input)
+            putStrLn $ "    Lines: " ++ show (length (T.lines input))
+            putStrLn "Output:"
             putStrLn $ "    File: " ++ out
-            putStrLn $ "    Token count: " ++ (show (length t))
+            putStrLn $ "    Token count: " ++ show (length t)
             let dt = diffUTCTime (systemToUTCTime et) (systemToUTCTime st) in
-                putStrLn $ "\nTime elapsed: " ++ (show dt)
+                putStrLn $ "\nTime elapsed: " ++ show dt
             writeFile out (show t)

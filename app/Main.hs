@@ -7,6 +7,7 @@ import           Build
 import           System.IO
 import qualified Data.Text                     as T
                                                 ( pack )
+import qualified Data.Text.IO                  as DT
 import           Parser                         ( program )
 
 main :: IO ()
@@ -19,21 +20,22 @@ main = do
             "--help"  -> printHelp
             "-h"      -> printHelp
             "--build" -> do
-                file <- readFile (args !! 1)
-                buildFromSource (T.pack file)
-            "--lex" -> do 
-                file <- readFile (args !! 1)
+                file <- DT.readFile (args !! 1)
+                buildFromSource file
+            "--lex" -> do
+                file <- DT.readFile (args !! 1)
                 let path = args !! 1
-                let out = args !! 2
-                lexOnly (T.pack file) path out
+                let out  = args !! 2
+                lexOnly file path out
             xs ->
                 putStrLn
                     ("Invalid option \"" ++ xs ++ "\" \n use --help for help")
 
 
 printHelp :: IO ()
-printHelp = putStrLn
-    "\n\
+printHelp =
+    putStrLn
+        "\n\
 \Penguor\n\
 \-------\n\n\
 \\

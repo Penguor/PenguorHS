@@ -50,39 +50,40 @@ getToken =
     skipSpace >> choice [try buildIdf, try buildNum, try buildString, getOther]
 
 buildIdf :: Parser Tok
-buildIdf = choice
-    [ tokBySymbol "fn"        FN        ""
-    , tokBySymbol "null"      NULL      ""
-    , tokBySymbol "system"    SYSTEM    ""
-    , tokBySymbol "container" CONTAINER ""
-    , tokBySymbol "datatype"  DATATYPE  ""
-    , tokBySymbol "library"   LIBRARY   ""
-    , tokBySymbol "if"        IF        ""
-    , tokBySymbol "elif"      ELIF      ""
-    , tokBySymbol "else"      ELSE      ""
-    , tokBySymbol "while"     WHILE     ""
-    , tokBySymbol "for"       FOR       ""
-    , tokBySymbol "do"        DO        ""
-    , tokBySymbol "from"      FROM      ""
-    , tokBySymbol "include"   INCLUDE   ""
-    , tokBySymbol "safety"    SAFETY    ""
-    , tokBySymbol "var"       VAR       ""
-    , tokBySymbol "true"      TRUE      ""
-    , tokBySymbol "false"     FALSE     ""
-    , tokBySymbol "switch"    SWITCH    ""
-    , tokBySymbol "case"      CASE      ""
-    , tokBySymbol "default"   DEFAULT   ""
-    , getIdf
-    ]
-
-getIdf :: Parser Tok
-getIdf = do
+buildIdf = do
+    skipSpace
     pos1  <- getSourcePos
-    first <- lexeme (letterChar <|> char '_')
+    first <- alphaNumChar <|> char '_'
     rest  <- many (alphaNumChar <|> char '_')
     pos2  <- getSourcePos
+    skipSpace
     let cp = T.pack (first : rest)
-    return $ Tok IDF (TokenPos pos1 pos2 (T.length cp)) cp
+    case cp of
+        "fn"        -> return $ newTok FN pos1 pos2 "fn"
+        "null"      -> return $ newTok NULL pos1 pos2 "null"
+        "system"    -> return $ newTok SYSTEM pos1 pos2 "system"
+        "container" -> return $ newTok CONTAINER pos1 pos2 "container"
+        "datatype"  -> return $ newTok DATATYPE pos1 pos2 "datatype"
+        "library"   -> return $ newTok LIBRARY pos1 pos2 "library"
+        "if"        -> return $ newTok IF pos1 pos2 "if"
+        "elif"      -> return $ newTok ELIF pos1 pos2 "elif"
+        "else"      -> return $ newTok ELSE pos1 pos2 "else"
+        "while"     -> return $ newTok WHILE pos1 pos2 "while"
+        "for"       -> return $ newTok FOR pos1 pos2 "for"
+        "do"        -> return $ newTok DO pos1 pos2 "do"
+        "from"      -> return $ newTok FROM pos1 pos2 "from"
+        "include"   -> return $ newTok INCLUDE pos1 pos2 "include"
+        "safety"    -> return $ newTok SAFETY pos1 pos2 "safety"
+        "var"       -> return $ newTok VAR pos1 pos2 "var"
+        "true"      -> return $ newTok TRUE pos1 pos2 "true"
+        "false"     -> return $ newTok FALSE pos1 pos2 "false"
+        "switch"    -> return $ newTok SWITCH pos1 pos2 "switch"
+        "case"      -> return $ newTok CASE pos1 pos2 "case"
+        "default"   -> return $ newTok DEFAULT pos1 pos2 "default"
+        _           -> return $ newIdf pos1 pos2 cp
+  where
+    newTok t p1 p2 c = Tok t (TokenPos p1 p2 (T.length c)) ""
+    newIdf p1 p2 c = Tok IDF (TokenPos p1 p2 (T.length c)) c
 
 buildNum :: Parser Tok
 buildNum = do
