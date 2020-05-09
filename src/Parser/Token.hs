@@ -40,6 +40,7 @@ data TType = HASHTAG
     | EQUALS | NEQUALS
     | AND | OR | NOT
     | ASSIGN
+    | ADD_ASSIGN | SUB_ASSIGN | MUL_ASSIGN | DIV_ASSIGN
     | NULL
     | COLON | SEMICOLON | DOT | COMMA | EXCL_MARK
     | VAR
