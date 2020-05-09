@@ -53,7 +53,7 @@ buildIdf :: Parser Tok
 buildIdf = do
     skipSpace
     pos1  <- getSourcePos
-    first <- alphaNumChar <|> char '_'
+    first <- letterChar <|> char '_'
     rest  <- many (alphaNumChar <|> char '_')
     pos2  <- getSourcePos
     skipSpace
