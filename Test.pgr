@@ -5,27 +5,27 @@
 
 library ShowPenguor
 {
-    system HelloWorld < Parent
+    restricted dynamic system HelloWorld < Parent
     {
-        fn void execute(string t)
+        public void execute(string t)
         {
-            var string a;
+            string a;
             a = "Hello " + name;
             if(true || false) 
             {
-                a = "no";
+                a += "no";
             } elif(true)
             {
-                a = "why?";
+                a += "why?";
             }
         }
     }
 
     container HelloData
     {
-        var string n1;
-        var string n2; 
-        var string n3; 
+        string n1;
+        string n2; 
+        string n3; 
 
         n1 = a;
         n2 = "Frank";

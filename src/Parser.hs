@@ -24,11 +24,11 @@ newtype Program = Program [Declaration]
     deriving(Show, Eq)
 
 data Declaration =
-      System Expression (Maybe Expression) Block
-    | Container Expression (Maybe Expression) Block
-    | Datatype Expression (Maybe Expression) Block
-    | Var Expression Expression
-    | Function Expression Expression [(Expression, Expression)] Block
+      System Modifier Expression (Maybe Expression) Block
+    | Container Modifier Expression (Maybe Expression) Block
+    | Datatype Modifier Expression (Maybe Expression) Block
+    | Var Modifier Expression Expression
+    | Function Modifier Expression Expression [(Expression, Expression)] Block
     | Library Expression Block
     | Stmt Statement
     deriving(Show, Eq)
@@ -58,7 +58,7 @@ data Elif = Elif Expression [Statement]
     deriving(Show, Eq)
 
 data Expression =
-      AssignExpr Expression Expression
+      AssignExpr Expression TType Expression
     | BinaryExpr Expression TType Expression
     | BooleanExpr Bool
     | CallExpr [Call]
@@ -75,61 +75,70 @@ data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall
 
     deriving(Show, Eq)
 
+data Modifier = Mod (Maybe Tok) [Tok]
+    deriving(Show, Eq)
+
 program :: Parser Program
 program = Program <$> some declaration <* (getByType EOF <?> "end of file")
 
 declaration :: Parser Declaration
-declaration = choice
-    [ try sysDec
-    , try contDec
-    , try dtypeDec
-    , try varDec
-    , try functionDec
-    , try libDec
-    , Stmt <$> statement
-    ]
+declaration = do
+    mods <- try getModifiers
+    if mods == Mod Nothing []
+        then choice
+            [ try $ sysDec mods
+            , try $ contDec mods
+            , try $ dtypeDec mods
+            , try $ varDec mods
+            , try $ functionDec mods
+            , try libDec
+            , Stmt <$> statement
+            ]
+        else choice
+            [ try $ sysDec mods
+            , try $ contDec mods
+            , try $ dtypeDec mods
+            , try $ varDec mods
+            , try $ functionDec mods
+            ]
 
 
-sysDec :: Parser Declaration
-sysDec = do
+sysDec :: Modifier -> Parser Declaration
+sysDec m = do
     getByType SYSTEM <?> "system"
     name <- getIdentifier <?> "system name"
     par  <- parent
-    System name par <$> blockStmt
+    System m name par <$> blockStmt
 
-contDec :: Parser Declaration
-contDec = do
+contDec :: Modifier -> Parser Declaration
+contDec m = do
     getByType CONTAINER <?> "container"
     name <- getIdentifier
     par  <- parent
-    Container name par <$> blockStmt
+    Container m name par <$> blockStmt
 
-dtypeDec :: Parser Declaration
-dtypeDec = do
-    getByType DATATYPE
+dtypeDec :: Modifier -> Parser Declaration
+dtypeDec m = do
+    getByType DATATYPE <?> "data type"
     name <- getIdentifier
     par  <- parent
-    Datatype name par <$> blockStmt
+    Datatype m name par <$> blockStmt
 
 parent :: Parser (Maybe Expression)
 parent = optional $ try (getByType LESS >> getIdentifier)
 
 
-varDec :: Parser Declaration
-varDec = do
-    getByType VAR
+varDec :: Modifier -> Parser Declaration
+varDec m = do
     (typ, name) <- var <* getByType SEMICOLON
-    return $ Var typ name
+    return $ Var m typ name
 
-functionDec :: Parser Declaration
-functionDec = do
-    getByType FN
-    typ    <- getIdentifier
-    name   <- getIdentifier
+functionDec :: Modifier -> Parser Declaration
+functionDec m = do
+    (typ, name) <- var
     params <- between (getByType LPAREN) (getByType RPAREN) $ option [] $ try
         parameters
-
-    Function typ name params <$> blockStmt
+    Function m typ name params <$> blockStmt
 
 libDec :: Parser Declaration
 libDec = do
@@ -137,6 +146,21 @@ libDec = do
     name <- getIdentifier
     Library name <$> blockStmt
 
+getModifiers :: Parser Modifier
+getModifiers = do
+    access <- optional
+        (   try (getByType PUBLIC)
+        <|> try (getByType PRIVATE)
+        <|> try (getByType PROTECTED)
+        <|> try (getByType RESTRICTED)
+        )
+    naccess <- many
+        (   try (getByType STATIC)
+        <|> try (getByType DYNAMIC)
+        <|> try (getByType ABSTRACT)
+        <|> try (getByType CONST)
+        )
+    return $ Mod access naccess
 
 statement :: Parser Statement
 statement = choice
@@ -260,26 +284,64 @@ expression = assignExpr
 
 assignExpr :: Parser Expression
 assignExpr = do
-    expr <- orExpr
-    op   <- optional $ try (getByType ASSIGN)
+    expr <- lOrExpr
+    op   <- optional
+        (   try (getByType ASSIGN)
+        <|> try (getByType ADD_ASSIGN)
+        <|> try (getByType SUB_ASSIGN)
+        <|> try (getByType MUL_ASSIGN)
+        <|> try (getByType DIV_ASSIGN)
+        )
     case op of
-        Just _  -> AssignExpr expr <$> orExpr
+        Just x  -> AssignExpr expr (typ x) <$> lOrExpr
         Nothing -> return expr
 
-orExpr :: Parser Expression
-orExpr = do
-    lhs <- andExpr
+lOrExpr :: Parser Expression
+lOrExpr = do
+    lhs <- lXorExpr
     op  <- optional $ try (getByType OR)
     case op of
-        Just _  -> BinaryExpr lhs OR <$> orExpr
+        Just _  -> BinaryExpr lhs OR <$> lOrExpr
         Nothing -> return lhs
 
-andExpr :: Parser Expression
-andExpr = do
-    lhs <- equalityExpr
+lXorExpr :: Parser Expression
+lXorExpr = do
+    lhs <- lAndExpr
+    op  <- optional $ try (getByType XOR)
+    case op of
+        Just _  -> BinaryExpr lhs XOR <$> lXorExpr
+        Nothing -> return lhs
+
+lAndExpr :: Parser Expression
+lAndExpr = do
+    lhs <- bwOrExpr
     op  <- optional $ try (getByType AND)
     case op of
-        Just _  -> BinaryExpr lhs AND <$> andExpr
+        Just _  -> BinaryExpr lhs AND <$> lAndExpr
+        Nothing -> return lhs
+
+bwOrExpr :: Parser Expression
+bwOrExpr = do
+    lhs <- bwXorExpr
+    op  <- optional $ try (getByType BW_OR)
+    case op of
+        Just _  -> BinaryExpr lhs BW_OR <$> bwOrExpr
+        Nothing -> return lhs
+
+bwXorExpr :: Parser Expression
+bwXorExpr = do
+    lhs <- bwAndExpr
+    op  <- optional $ try (getByType BW_XOR)
+    case op of
+        Just _  -> BinaryExpr lhs BW_XOR <$> bwXorExpr
+        Nothing -> return lhs
+
+bwAndExpr :: Parser Expression
+bwAndExpr = do
+    lhs <- equalityExpr
+    op  <- optional $ try (getByType BW_AND)
+    case op of
+        Just _  -> BinaryExpr lhs BW_AND <$> bwAndExpr
         Nothing -> return lhs
 
 equalityExpr :: Parser Expression
@@ -321,7 +383,10 @@ multiplicationExpr = do
 
 unaryExpr :: Parser Expression
 unaryExpr = do
-    op <- optional (try (getByType EXCL_MARK) <|> try (getByType MINUS))
+    op <- optional
+        (try (getByType EXCL_MARK) <|> try (getByType MINUS) <|> try
+            (getByType BW_NOT)
+        )
     case op of
         Just x  -> UnaryExpr (typ x) <$> unaryExpr
         Nothing -> try groupingExpr <|> try callExpr
@@ -366,6 +431,10 @@ getArgs :: Parser [Expression]
 getArgs = do
     base <- option NullExpr expression -- ! seems to be incorrect
 
+
+
+
+
     case base of
         NullExpr -> return []
         _        -> idfs
@@ -398,5 +467,9 @@ getIdentifier = do
 --getString = do
 --    T.pack <$> between (getByType TType) (char '"') (many (text))
 --    where text = satisfy (/= '"')
+
+
+
+
 
 

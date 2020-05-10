@@ -30,25 +30,27 @@ type Parser = Parsec Void PStream
 
 
 data TType = HASHTAG
-    | FROM | INCLUDE | SAFETY
+    | FROM | INCLUDE | SAFETY -- pp directives -- ? maybe make them statements?
+    | PUBLIC | PRIVATE | PROTECTED | RESTRICTED -- access modifiers
+    | STATIC | DYNAMIC -- non-access modifiers
+    | ABSTRACT | CONST -- non-access modifiers
     | LPAREN | RPAREN -- ()
     | LBRACE | RBRACE -- {}
     | LBRACK | RBRACK -- []
-    | PLUS | MINUS | MUL | DIV
+    | PLUS | MINUS | MUL | DIV -- basic math operations
     | GREATER | LESS
     | GREATER_EQUALS | LESS_EQUALS
     | EQUALS | NEQUALS
-    | AND | OR | NOT
+    | AND | OR | XOR | NOT
+    | BW_AND | BW_OR | BW_XOR | BW_NOT
     | ASSIGN
     | ADD_ASSIGN | SUB_ASSIGN | MUL_ASSIGN | DIV_ASSIGN
     | NULL
     | COLON | SEMICOLON | DOT | COMMA | EXCL_MARK
-    | VAR
     | NUM
     | STRING
     | IDF
     | TRUE | FALSE
-    | FN
     | CONTAINER | SYSTEM | DATATYPE
     | LIBRARY
     | IF | ELIF | ELSE
@@ -66,8 +68,8 @@ data TokenPos = TokenPos {startPos :: SourcePos, endPos :: SourcePos, tokLength 
 
 instance Show Tok where
     show a = "(Token type: " ++ show (typ a) ++ if T.unpack (txt a) == ""
-        then ")\n"
-        else ", value: " ++ T.unpack (txt a) ++ ")\n"
+        then ")"
+        else ", value: " ++ T.unpack (txt a) ++ ")"
 
 data PStream = PStream { streamInput :: Text, streamTokens :: [Tok]}
 
