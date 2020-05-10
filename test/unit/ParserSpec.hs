@@ -45,41 +45,44 @@ spec = describe "program" $ do
     it "can parse multiple declarations"
         $ program "system STest {} container CTest {} datatype DTest {}"
         `shouldParse` P.Program
-                          [ P.System (P.IdfExpr "STest") Nothing (P.Block [])
-                          , P.Container (P.IdfExpr "CTest") Nothing (P.Block [])
-                          , P.Datatype (P.IdfExpr "DTest") Nothing (P.Block [])
+                          [ P.System (P.Mod Nothing [])(P.IdfExpr "STest") Nothing (P.Block [])
+                          , P.Container (P.Mod Nothing [])(P.IdfExpr "CTest") Nothing (P.Block [])
+                          , P.Datatype (P.Mod Nothing [])(P.IdfExpr "DTest") Nothing (P.Block [])
                           ]
 
     describe "declaration" $ do
         let declaration = parseT P.declaration
         it "can execute the system parser"
             $             declaration "system Test {}"
-            `shouldParse` P.System (P.IdfExpr "Test") Nothing (P.Block [])
+            `shouldParse` P.System (P.Mod Nothing [])(P.IdfExpr "Test") Nothing (P.Block [])
         describe "sysDec" $ do
-            let sysDec = parseT P.sysDec
+            let sysDec = parseT (P.sysDec (P.Mod Nothing []))
             it "can parse systems"
                 $             sysDec "system Test < Super {}"
-                `shouldParse` P.System (P.IdfExpr "Test")
+                `shouldParse` P.System (P.Mod Nothing [])
+                                       (P.IdfExpr "Test")
                                        (Just (P.IdfExpr "Super"))
                                        (P.Block [])
         it "can execute the container parser"
             $             declaration "container Test {}"
-            `shouldParse` P.Container (P.IdfExpr "Test") Nothing (P.Block [])
+            `shouldParse` P.Container (P.Mod Nothing [])(P.IdfExpr "Test") Nothing (P.Block [])
         describe "contDec" $ do
-            let contDec = parseT P.contDec
+            let contDec = parseT (P.contDec (P.Mod Nothing []))
             it "can parse containers"
                 $             contDec "container Test < Super {}"
-                `shouldParse` P.Container (P.IdfExpr "Test")
+                `shouldParse` P.Container (P.Mod Nothing [])
+                                          (P.IdfExpr "Test")
                                           (Just (P.IdfExpr "Super"))
                                           (P.Block [])
         it "can execute the datatype parser"
             $             declaration "datatype Test {}"
-            `shouldParse` P.Datatype (P.IdfExpr "Test") Nothing (P.Block [])
+            `shouldParse` P.Datatype (P.Mod Nothing [])(P.IdfExpr "Test") Nothing (P.Block [])
         describe "dtypeDec" $ do
-            let dtypeDec = parseT P.dtypeDec
+            let dtypeDec = parseT (P.dtypeDec (P.Mod Nothing []))
             it "can parse datatype declarations"
                 $             dtypeDec "datatype Test < Super {}"
-                `shouldParse` P.Datatype (P.IdfExpr "Test")
+                `shouldParse` P.Datatype (P.Mod Nothing [])
+                                         (P.IdfExpr "Test")
                                          (Just (P.IdfExpr "Super"))
                                          (P.Block [])
         describe "parent" $ do
@@ -87,24 +90,30 @@ spec = describe "program" $ do
             it "can parse parents" $ parent "< Super" `shouldParse` Just
                 (P.IdfExpr "Super")
         it "can execute the variable parser"
-            $             declaration "var int test;"
-            `shouldParse` P.Var (P.IdfExpr "int") (P.IdfExpr "test")
+            $             declaration "int test;"
+            `shouldParse` P.Var (P.Mod Nothing [])
+                                (P.IdfExpr "int")
+                                (P.IdfExpr "test")
         describe "varDec" $ do
-            let varDec = parseT P.varDec
+            let varDec = parseT (P.varDec (P.Mod Nothing []))
             it "can parse variable declarations"
-                $             varDec "var bool test;"
-                `shouldParse` P.Var (P.IdfExpr "bool") (P.IdfExpr "test")
+                $             varDec "bool test;"
+                `shouldParse` P.Var (P.Mod Nothing [])
+                                    (P.IdfExpr "bool")
+                                    (P.IdfExpr "test")
         it "can execute the function parser"
-            $             declaration "fn int test() {}"
-            `shouldParse` P.Function (P.IdfExpr "int")
+            $             declaration "int test() {}"
+            `shouldParse` P.Function (P.Mod Nothing [])
+                                     (P.IdfExpr "int")
                                      (P.IdfExpr "test")
                                      []
                                      (P.Block [])
         describe "function" $ do
-            let functionDec = parseT P.functionDec
+            let functionDec = parseT (P.functionDec (P.Mod Nothing []))
             it "can parse function declarations"
-                $ functionDec "fn void transform(int x, int y, int z) {}"
+                $ functionDec "void transform(int x, int y, int z) {}"
                 `shouldParse` P.Function
+                                  (P.Mod Nothing [])
                                   (P.IdfExpr "void")
                                   (P.IdfExpr "transform")
                                   [ (P.IdfExpr "int", P.IdfExpr "x")
@@ -133,18 +142,6 @@ spec = describe "program" $ do
                     it "fails when name or type is missing"
                         $              parseF P.parameters
                         `shouldFailOn` getStream "bool, string test"
-
-
-
-
-
-
-
-
-
-
-
-
             describe "var" $ do
                 let var = parseT P.var
                 it "parses a single parameter"
@@ -210,9 +207,6 @@ spec = describe "program" $ do
                                       `shouldFailOn` getStream "safety 8"
                                   parseF P.safety
                                       `shouldFailOn` getStream "safety 9"
-
-
-
             it "can execute the if statement parser"
                 $             statement "if(true) {i=1;}"
                 `shouldParse` P.IfStmt
@@ -222,6 +216,7 @@ spec = describe "program" $ do
                                             (P.CallExpr
                                                 [P.BaseCall (P.IdfExpr "i")]
                                             )
+                                            ASSIGN
                                             (P.CallExpr
                                                 [P.BaseCall (P.NumExpr 1)]
                                             )
@@ -245,6 +240,7 @@ spec = describe "program" $ do
                                                       (P.IdfExpr "result")
                                                 ]
                                             )
+                                            ASSIGN
                                             (P.BinaryExpr
                                                 (P.CallExpr
                                                     [P.BaseCall (P.IdfExpr "a")]
@@ -270,6 +266,7 @@ spec = describe "program" $ do
                                                       (P.IdfExpr "result")
                                                 ]
                                             )
+                                            ASSIGN
                                             (P.BinaryExpr
                                                 (P.CallExpr
                                                     [ P.BaseCall
@@ -293,6 +290,7 @@ spec = describe "program" $ do
                                             (P.CallExpr
                                                 [P.BaseCall (P.IdfExpr "a")]
                                             )
+                                            ASSIGN
                                             (P.BinaryExpr
                                                 (P.CallExpr
                                                     [P.BaseCall (P.IdfExpr "a")]
@@ -315,20 +313,6 @@ spec = describe "program" $ do
 \        a = a + 1; \
 \    default: \
 \        a = 2; \
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 \}"
                 `shouldParse` P.SwitchStmt
                                   (P.IdfExpr "test")
@@ -342,6 +326,7 @@ spec = describe "program" $ do
                                                 (P.CallExpr
                                                     [P.BaseCall (P.IdfExpr "a")]
                                                 )
+                                                ASSIGN
                                                 (P.BinaryExpr
                                                     (P.CallExpr
                                                         [ P.BaseCall
@@ -364,6 +349,7 @@ spec = describe "program" $ do
                                                 (P.CallExpr
                                                     [P.BaseCall (P.IdfExpr "a")]
                                                 )
+                                                ASSIGN
                                                 (P.CallExpr
                                                     [P.BaseCall (P.NumExpr 2)]
                                                 )
@@ -371,18 +357,20 @@ spec = describe "program" $ do
                                       ]
                                   )
             it "can execute the expression statement parser"
-                $             statement "a = b;"
+                $             statement "a /= b;"
                 `shouldParse` P.ExprStmt
                                   (P.AssignExpr
                                       (P.CallExpr [P.BaseCall (P.IdfExpr "a")])
+                                      DIV_ASSIGN
                                       (P.CallExpr [P.BaseCall (P.IdfExpr "b")])
                                   )
             describe "expression" $ do
                 let expression = parseT P.expression
                 it "can parse expressions"
-                    $             expression "a = b;"
+                    $             expression "a += b;"
                     `shouldParse` P.AssignExpr
                                       (P.CallExpr [P.BaseCall (P.IdfExpr "a")])
+                                      ADD_ASSIGN
                                       (P.CallExpr [P.BaseCall (P.IdfExpr "b")])
                 it "can parse assign expressions"
                     $             expression "name = \"Peter\";"
@@ -390,6 +378,7 @@ spec = describe "program" $ do
                                       (P.CallExpr
                                           [P.BaseCall (P.IdfExpr "name")]
                                       )
+                                      ASSIGN
                                       (P.CallExpr
                                           [P.BaseCall (P.StringExpr "Peter")]
                                       )
@@ -404,21 +393,6 @@ spec = describe "program" $ do
                                       )
                 it "can parse and expressions"
                     $             expression "true && isEntity;" -- ! inspect why some expressions need a semicolon to parse
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                     `shouldParse` P.BinaryExpr
                                       (P.CallExpr [P.BaseCall (P.BaseExpr TRUE)]
                                       )
