@@ -99,7 +99,7 @@ declaration = do
             , contDec mods
             , try $ dtypeDec mods
             , try $ functionDec mods
-            , varDec      mods
+            , varDec mods
             ]
 
 
@@ -288,6 +288,7 @@ assignExpr = do
         <|> try (getByType SUB_ASSIGN)
         <|> try (getByType MUL_ASSIGN)
         <|> try (getByType DIV_ASSIGN)
+        <|> try (getByType PERCENT_ASSIGN)
         <|> try (getByType BW_OR_ASSIGN)
         <|> try (getByType BW_XOR_ASSIGN)
         <|> try (getByType BW_AND_ASSIGN)
@@ -356,7 +357,7 @@ equalityExpr = do
 
 relationExpr :: Parser Expression
 relationExpr = do
-    lhs <- additionExpr
+    lhs <- bitshiftExpr
     op  <- optional
         (   try (getByType LESS_EQUALS)
         <|> try (getByType GREATER_EQUALS)
@@ -366,6 +367,15 @@ relationExpr = do
     case op of
         Just x  -> BinaryExpr lhs (typ x) <$> relationExpr
         Nothing -> return lhs
+
+bitshiftExpr :: Parser Expression
+bitshiftExpr = do
+    lhs <- additionExpr
+    op  <- optional (try (getByType BS_LEFT) <|> try (getByType BS_RIGHT))
+    case op of
+        Just x  -> BinaryExpr lhs (typ x) <$> bitshiftExpr
+        Nothing -> return lhs
+
 
 additionExpr :: Parser Expression
 additionExpr = do
@@ -386,8 +396,11 @@ multiplicationExpr = do
 unaryExpr :: Parser Expression
 unaryExpr = do
     op <- optional
-        (try (getByType EXCL_MARK) <|> try (getByType MINUS) <|> try
-            (getByType BW_NOT)
+        (   try (getByType EXCL_MARK)
+        <|> try (getByType MINUS)
+        <|> try (getByType BW_NOT)
+        <|> try (getByType DPLUS)
+        <|> try (getByType DMINUS)
         )
     case op of
         Just x  -> UnaryExpr (typ x) <$> unaryExpr
@@ -402,7 +415,14 @@ getCall = do
     base <- baseExpr
     case base of
         IdfExpr _ -> do
-            next <- optional $ try (getType LPAREN <|> getType DOT)
+            next <-
+                optional
+                    $ try
+                          (   getType LPAREN
+                          <|> getType DOT
+                          <|> getType DPLUS
+                          <|> getType DMINUS
+                          ) -- TODO: add calls for posftix operators
             case next of
                 Just DOT -> do
                     rest <- getCall

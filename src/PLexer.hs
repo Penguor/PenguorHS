@@ -50,6 +50,8 @@ getToken =
     skipSpace >> choice [try buildIdf, try buildNum, try buildString, getOther]
 
 -- lex identifiers
+
+
 buildIdf :: Parser Tok
 buildIdf = do
     skipSpace
@@ -93,6 +95,8 @@ buildIdf = do
     newIdf p1 p2 c = Tok IDF (TokenPos p1 p2 (T.length c)) c
 
 -- build numbers
+
+
 buildNum :: Parser Tok
 buildNum = do
     p1    <- getSourcePos
@@ -109,6 +113,8 @@ buildNum = do
             return $ Tok NUM (TokenPos p1 p2 (T.length cp)) cp
 
 --build a string 
+
+
 buildString :: Parser Tok
 buildString = do
     skipSpace
@@ -120,6 +126,8 @@ buildString = do
     where text = satisfy (/= '"')
 
 -- ! optimise getOther
+
+
 getOther :: Parser Tok
 getOther = do
     skipSpace
@@ -127,11 +135,17 @@ getOther = do
     cur <- anySingle
     case cur of
         '+' -> do
-            t <- next '='
-            if t then newTok ADD_ASSIGN p1 2 else newTok PLUS p1 1
+            t <- mulNext "+="
+            case t of
+                '+' -> newTok DPLUS p1 2
+                '=' -> newTok ADD_ASSIGN p1 2
+                _   -> newTok PLUS p1 1
         '-' -> do
-            t <- next '='
-            if t then newTok SUB_ASSIGN p1 2 else newTok MINUS p1 1
+            t <- mulNext "-="
+            case t of
+                '-' -> newTok DMINUS p1 2
+                '=' -> newTok SUB_ASSIGN p1 2
+                _   -> newTok MINUS p1 1
         '*' -> do
             t <- next '='
             if t then newTok MUL_ASSIGN p1 2 else newTok MUL p1 1
@@ -140,7 +154,7 @@ getOther = do
             if t then newTok DIV_ASSIGN p1 2 else newTok DIV p1 1
         '%' -> do
             t <- next '='
-            if t then newTok DIV_ASSIGN p1 2 else newTok DIV p1 1
+            if t then newTok PERCENT_ASSIGN p1 2 else newTok PERCENT p1 1
         '!' -> newTok EXCL_MARK p1 1
         '~' -> newTok BW_NOT p1 1
         '(' -> newTok LPAREN p1 1
@@ -200,8 +214,8 @@ getOther = do
     next s = do
         t <- optional (single s)
         case t of
-            Just _  -> return $ True
-            Nothing -> return $ False
+            Just _  -> return True
+            Nothing -> return False
     newTok t p1 l = do
         p2 <- getSourcePos
         return $ Tok t (TokenPos p1 p2 l) ""

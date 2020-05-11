@@ -39,6 +39,7 @@ data TType = HASHTAG
     | LBRACK | RBRACK -- []
     | PLUS | MINUS -- basic math operations
     | MUL | DIV | PERCENT -- basic math operations
+    | DPLUS | DMINUS -- ++ and --
     | GREATER | LESS
     | GREATER_EQUALS | LESS_EQUALS
     | EQUALS | NEQUALS
