@@ -10,7 +10,7 @@ where
 import           Data.Void
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import qualified Data.List                     as DL
+import           Data.Char
 
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
@@ -50,17 +50,15 @@ getToken =
     skipSpace >> choice [try buildIdf, try buildNum, try buildString, getOther]
 
 -- lex identifiers
-
-
 buildIdf :: Parser Tok
 buildIdf = do
     skipSpace
     p1    <- getSourcePos
-    first <- letterChar <|> char '_'
-    rest  <- many (alphaNumChar <|> char '_')
+    first <- takeWhile1P (Just "letter or underscore") fst
+    rest  <- takeWhileP (Just "letter, digit, or underscore") other
     p2    <- getSourcePos
     skipSpace
-    let cp = T.pack (first : rest)
+    let cp = T.append first rest
     case cp of
         "null"       -> return $ newTok NULL p1 p2 "null"
         "system"     -> return $ newTok SYSTEM p1 p2 "system"
@@ -93,39 +91,37 @@ buildIdf = do
   where
     newTok t p1 p2 c = Tok t (TokenPos p1 p2 (T.length c)) ""
     newIdf p1 p2 c = Tok IDF (TokenPos p1 p2 (T.length c)) c
+    fst a = isLetter a || (a == '_')
+    other a = isAlphaNum a || (a == '_')
 
 -- build numbers
-
-
 buildNum :: Parser Tok
 buildNum = do
     p1    <- getSourcePos
-    front <- some digitChar
+    front <- takeWhile1P (Just "digit") isDigit
     dot   <- optional (char '.')
     case dot of
         Nothing -> do
             p2 <- getSourcePos
-            return $ Tok NUM (TokenPos p1 p2 (length front)) (T.pack front)
+            return $ Tok NUM (TokenPos p1 p2 (T.length front)) front
         Just _ -> do
-            rest <- some digitChar
+            rest <- takeWhile1P (Just "digit") isDigit
             p2   <- getSourcePos
-            let cp = T.pack (front ++ "." ++ rest)
+            let cp = T.append front (T.append "." rest)
             return $ Tok NUM (TokenPos p1 p2 (T.length cp)) cp
 
 --build a string 
-
-
 buildString :: Parser Tok
 buildString = do
     skipSpace
     p1  <- getSourcePos
-    str <- between (single '"') (single '"') (many text)
-    p2  <- getSourcePos
+    str <- between (single '"')
+                   (single '"')
+                   (takeWhileP (Just "any char but '\"'") text)
+    p2 <- getSourcePos
     skipSpace
-    return $ Tok STRING (TokenPos p1 p2 (length str)) (T.pack str)
-    where text = satisfy (/= '"')
-
--- ! optimise getOther
+    return $ Tok STRING (TokenPos p1 p2 (T.length str)) str
+    where text a = a /= '"'
 
 
 getOther :: Parser Tok
