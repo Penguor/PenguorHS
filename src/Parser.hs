@@ -10,6 +10,7 @@ import           Data.Void
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Text.Read
+import qualified Data.List.NonEmpty            as NE
 
 import           Text.Megaparsec
 import           Text.Megaparsec.Debug
@@ -27,7 +28,7 @@ data Declaration =
       System Modifier Expression (Maybe Expression) Block
     | Container Modifier Expression (Maybe Expression) Block
     | Datatype Modifier Expression (Maybe Expression) Block
-    | Var Modifier Expression Expression
+    | Var Modifier Expression Expression (Maybe Expression)
     | Function Modifier Expression Expression [(Expression, Expression)] Block
     | Library Expression Block
     | Stmt Statement
@@ -72,7 +73,6 @@ data Expression =
     deriving(Show, Eq)
 
 data Call =  FnCall Expression [Expression] | BaseCall Expression -- ?  basecall - better name?
-
     deriving(Show, Eq)
 
 data Modifier = Mod (Maybe Tok) [Tok]
@@ -86,40 +86,40 @@ declaration = do
     mods <- try getModifiers
     if mods == Mod Nothing []
         then choice
-            [ try $ sysDec mods
-            , try $ contDec mods
-            , try $ dtypeDec mods
-            , try $ varDec mods
+            [ sysDec mods
+            , contDec mods
+            , dtypeDec mods
             , try $ functionDec mods
-            , try libDec
+            , try $ varDec mods
+            , libDec
             , Stmt <$> statement
             ]
         else choice
-            [ try $ sysDec mods
-            , try $ contDec mods
+            [ sysDec mods
+            , contDec mods
             , try $ dtypeDec mods
-            , try $ varDec mods
             , try $ functionDec mods
+            , varDec      mods
             ]
 
 
 sysDec :: Modifier -> Parser Declaration
 sysDec m = do
-    getByType SYSTEM <?> "system"
+    try (getByType SYSTEM <?> "system")
     name <- getIdentifier <?> "system name"
     par  <- parent
     System m name par <$> blockStmt
 
 contDec :: Modifier -> Parser Declaration
 contDec m = do
-    getByType CONTAINER <?> "container"
+    try (getByType CONTAINER <?> "container")
     name <- getIdentifier
     par  <- parent
     Container m name par <$> blockStmt
 
 dtypeDec :: Modifier -> Parser Declaration
 dtypeDec m = do
-    getByType DATATYPE <?> "data type"
+    try (getByType DATATYPE <?> "data type")
     name <- getIdentifier
     par  <- parent
     Datatype m name par <$> blockStmt
@@ -130,11 +130,16 @@ parent = optional $ try (getByType LESS >> getIdentifier)
 
 varDec :: Modifier -> Parser Declaration
 varDec m = do
-    (typ, name) <- var <* getByType SEMICOLON
-    return $ Var m typ name
+    lookAhead
+        (try var >> choice [try (getByType ASSIGN), try (getByType SEMICOLON)])
+    (typ, name) <- var
+    value       <- optional (try $ getByType ASSIGN >> lOrExpr)
+    getByType SEMICOLON
+    return $ Var m typ name value
 
 functionDec :: Modifier -> Parser Declaration
 functionDec m = do
+    lookAhead (try var >> try (getByType LPAREN))
     (typ, name) <- var
     params <- between (getByType LPAREN) (getByType RPAREN) $ option [] $ try
         parameters
@@ -142,7 +147,7 @@ functionDec m = do
 
 libDec :: Parser Declaration
 libDec = do
-    getByType LIBRARY
+    try $ getByType LIBRARY
     name <- getIdentifier
     Library name <$> blockStmt
 
@@ -164,18 +169,11 @@ getModifiers = do
 
 statement :: Parser Statement
 statement = choice
-    [ try preProcessorStmt
-    , try ifStmt
-    , try whileStmt
-    , try forStmt
-    , try doStmt
-    , try switchStmt
-    , exprStmt
-    ]
+    [preProcessorStmt, ifStmt, whileStmt, forStmt, doStmt, switchStmt, exprStmt]
 
 
 preProcessorStmt :: Parser Statement
-preProcessorStmt = getByType HASHTAG >> PPStmt <$> ppDirective
+preProcessorStmt = try $ getByType HASHTAG >> PPStmt <$> ppDirective
 
 ppDirective :: Parser PPDirective
 ppDirective =
@@ -208,7 +206,7 @@ blockStmt =
 
 ifStmt :: Parser Statement
 ifStmt = do
-    getByType IF
+    try $ getByType IF
     condition  <- between (getByType LPAREN) (getByType RPAREN) expression
     code       <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     elifBlocks <- many elif
@@ -228,14 +226,14 @@ elif = do
 
 whileStmt :: Parser Statement
 whileStmt = do
-    getByType WHILE
+    try $ getByType WHILE
     condition <- between (getByType LPAREN) (getByType RPAREN) expression
     code      <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     return $ WhileStmt condition code
 
 forStmt :: Parser Statement
 forStmt = do
-    getByType FOR >> getByType LPAREN
+    try $ getByType FOR >> getByType LPAREN
     element <- getIdentifier <* getByType COLON
     list    <- expression <* getByType RPAREN
     code    <- between (getByType LBRACE) (getByType RBRACE) (some statement)
@@ -243,7 +241,7 @@ forStmt = do
 
 doStmt :: Parser Statement
 doStmt = do
-    getByType DO
+    try $ getByType DO
     code <- between (getByType LBRACE) (getByType RBRACE) (some statement)
     getByType WHILE
     condition <- between (getByType LPAREN) (getByType RPAREN) expression
@@ -252,7 +250,7 @@ doStmt = do
 
 switchStmt :: Parser Statement
 switchStmt = do
-    getByType SWITCH
+    try $ getByType SWITCH
     idf <- between (getByType LPAREN) (getByType RPAREN) getIdentifier
     getByType LBRACE
     cases <- some caseStmt
@@ -278,7 +276,6 @@ caseStmt = do
 exprStmt :: Parser Statement
 exprStmt = ExprStmt <$> (expression <* getByType SEMICOLON)
 
-
 expression :: Parser Expression
 expression = assignExpr
 
@@ -291,6 +288,11 @@ assignExpr = do
         <|> try (getByType SUB_ASSIGN)
         <|> try (getByType MUL_ASSIGN)
         <|> try (getByType DIV_ASSIGN)
+        <|> try (getByType BW_OR_ASSIGN)
+        <|> try (getByType BW_XOR_ASSIGN)
+        <|> try (getByType BW_AND_ASSIGN)
+        <|> try (getByType BS_LEFT_ASSIGN)
+        <|> try (getByType BS_RIGHT_ASSIGN)
         )
     case op of
         Just x  -> AssignExpr expr (typ x) <$> lOrExpr
@@ -435,6 +437,12 @@ getArgs = do
 
 
 
+
+
+
+
+
+
     case base of
         NullExpr -> return []
         _        -> idfs
@@ -467,6 +475,12 @@ getIdentifier = do
 --getString = do
 --    T.pack <$> between (getByType TType) (char '"') (many (text))
 --    where text = satisfy (/= '"')
+
+
+
+
+
+
 
 
 

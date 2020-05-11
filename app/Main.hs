@@ -5,10 +5,7 @@ module Main where
 import           System.Environment
 import           Build
 import           System.IO
-import qualified Data.Text                     as T
-                                                ( pack )
 import qualified Data.Text.IO                  as DT
-import           Parser                         ( program )
 
 main :: IO ()
 main = do
@@ -21,7 +18,7 @@ main = do
             "-h"      -> printHelp
             "--build" -> do
                 file <- DT.readFile (args !! 1)
-                buildFromSource file
+                buildFromSource (args !! 1) file
             "--lex" -> do
                 file <- DT.readFile (args !! 1)
                 let path = args !! 1

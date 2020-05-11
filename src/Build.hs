@@ -11,15 +11,15 @@ import           Parser.Token                   ( PStream(..) )
 import           Data.Time.Clock.System
 import           Data.Time.Clock
 
-buildFromSource :: Text -> IO ()
-buildFromSource input = do
+buildFromSource :: String -> Text -> IO ()
+buildFromSource file input = do
     parseTest tokenize input
     putStr "\n"
     either (putStrLn <$> errorBundlePretty)
            (parseTest program)
            (stream <$> toks)
   where
-    toks = parse tokenize "" input
+    toks = parse tokenize file input
     stream a = PStream { streamInput = input, streamTokens = a }
 
 lexOnly :: Text -> String -> String -> IO ()

@@ -111,11 +111,11 @@ buildNum = do
 --build a string 
 buildString :: Parser Tok
 buildString = do
+    skipSpace
     p1  <- getSourcePos
-    str <- between (skipSpace >> single '"')
-                   (single '"' <* skipSpace)
-                   (many text)
-    p2 <- getSourcePos
+    str <- between (single '"') (single '"') (many text)
+    p2  <- getSourcePos
+    skipSpace
     return $ Tok STRING (TokenPos p1 p2 (length str)) (T.pack str)
     where text = satisfy (/= '"')
 
@@ -128,16 +128,19 @@ getOther = do
     case cur of
         '+' -> do
             t <- next '='
-            if t == '=' then newTok ADD_ASSIGN p1 2 else newTok PLUS p1 1
+            if t then newTok ADD_ASSIGN p1 2 else newTok PLUS p1 1
         '-' -> do
             t <- next '='
-            if t == '=' then newTok SUB_ASSIGN p1 2 else newTok MINUS p1 1
+            if t then newTok SUB_ASSIGN p1 2 else newTok MINUS p1 1
         '*' -> do
             t <- next '='
-            if t == '=' then newTok MUL_ASSIGN p1 2 else newTok MUL p1 1
+            if t then newTok MUL_ASSIGN p1 2 else newTok MUL p1 1
         '/' -> do
             t <- next '='
-            if t == '=' then newTok DIV_ASSIGN p1 2 else newTok DIV p1 1
+            if t then newTok DIV_ASSIGN p1 2 else newTok DIV p1 1
+        '%' -> do
+            t <- next '='
+            if t then newTok DIV_ASSIGN p1 2 else newTok DIV p1 1
         '!' -> newTok EXCL_MARK p1 1
         '~' -> newTok BW_NOT p1 1
         '(' -> newTok LPAREN p1 1
@@ -151,27 +154,57 @@ getOther = do
         ':' -> newTok COLON p1 1
         ';' -> newTok SEMICOLON p1 1
         '<' -> do
-            t <- next '='
-            if t == '=' then newTok LESS_EQUALS p1 2 else newTok LESS p1 1
+            t <- mulNext "<="
+            case t of
+                '<' -> do
+                    a <- next '='
+                    if a
+                        then newTok BS_LEFT_ASSIGN p1 3
+                        else newTok BS_LEFT p1 2
+                '=' -> newTok LESS_EQUALS p1 2
+                _   -> newTok LESS p1 1
         '>' -> do
-            t <- next '='
-            if t == '=' then newTok GREATER_EQUALS p1 2 else newTok GREATER p1 1
+            t <- mulNext ">="
+            case t of
+                '>' -> do
+                    a <- next '='
+                    if a
+                        then newTok BS_LEFT_ASSIGN p1 3
+                        else newTok BS_LEFT p1 2
+                '=' -> newTok GREATER_EQUALS p1 2
+                _   -> newTok GREATER p1 1
         '&' -> do
-            t <- next '&'
-            if t == '&' then newTok AND p1 2 else newTok BW_AND p1 1
+            t <- mulNext "&="
+            case t of
+                '&' -> newTok AND p1 2
+                '=' -> newTok BW_AND_ASSIGN p1 2
+                _   -> newTok BW_AND p1 1
         '|' -> do
-            t <- next '|'
-            if t == '|' then newTok OR p1 2 else newTok BW_OR p1 1
+            t <- mulNext "|="
+            case t of
+                '|' -> newTok OR p1 2
+                '=' -> newTok BW_OR_ASSIGN p1 2
+                _   -> newTok BW_OR p1 1
         '^' -> do
-            t <- next '^'
-            if t == '^' then newTok XOR p1 2 else newTok BW_XOR p1 1
+            t <- mulNext "^="
+            case t of
+                '^' -> newTok XOR p1 2
+                '=' -> newTok BW_XOR_ASSIGN p1 2
+                _   -> newTok BW_XOR p1 1
         '#' -> newTok HASHTAG p1 2
         '=' -> do
             t <- next '='
-            if t == '=' then newTok EQUALS p1 2 else newTok ASSIGN p1 1
+            if t then newTok EQUALS p1 2 else newTok ASSIGN p1 1
 
   where
-    next s = option ' ' (single s)
+    next s = do
+        t <- optional (single s)
+        case t of
+            Just _  -> return $ True
+            Nothing -> return $ False
     newTok t p1 l = do
         p2 <- getSourcePos
         return $ Tok t (TokenPos p1 p2 l) ""
+
+mulNext :: String -> Parser Char
+mulNext a = option ' ' $ oneOf a

@@ -37,14 +37,19 @@ data TType = HASHTAG
     | LPAREN | RPAREN -- ()
     | LBRACE | RBRACE -- {}
     | LBRACK | RBRACK -- []
-    | PLUS | MINUS | MUL | DIV -- basic math operations
+    | PLUS | MINUS -- basic math operations
+    | MUL | DIV | PERCENT -- basic math operations
     | GREATER | LESS
     | GREATER_EQUALS | LESS_EQUALS
     | EQUALS | NEQUALS
-    | AND | OR | XOR | NOT
-    | BW_AND | BW_OR | BW_XOR | BW_NOT
-    | ASSIGN
-    | ADD_ASSIGN | SUB_ASSIGN | MUL_ASSIGN | DIV_ASSIGN
+    | AND | OR | XOR | NOT -- logical operations
+    | BW_AND | BW_OR | BW_XOR | BW_NOT -- bitwise operations
+    | BS_LEFT | BS_RIGHT -- bitshift operations
+    | ASSIGN -- assignment
+    | ADD_ASSIGN | SUB_ASSIGN
+    | MUL_ASSIGN | DIV_ASSIGN | PERCENT_ASSIGN
+    | BW_AND_ASSIGN | BW_OR_ASSIGN | BW_XOR_ASSIGN
+    | BS_LEFT_ASSIGN | BS_RIGHT_ASSIGN
     | NULL
     | COLON | SEMICOLON | DOT | COMMA | EXCL_MARK
     | NUM
